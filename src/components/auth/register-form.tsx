@@ -23,6 +23,7 @@ import { useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
+import type { User } from "@/types";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -60,7 +61,7 @@ export function RegisterForm() {
 
       // Create user document in Firestore
       const userDocRef = doc(db, "users", firebaseUser.uid);
-      await setDoc(userDocRef, {
+      const newUserDoc: Omit<User, 'password' | 'confirmPassword' | 'lastLogin' | 'subscriptionPlanId'> = {
         uid: firebaseUser.uid,
         name: values.name,
         email: values.email,
@@ -68,11 +69,13 @@ export function RegisterForm() {
         status: "active",
         createdAt: new Date().toISOString(),
         enabledServices: [], // Default empty enabled services
-      });
+        avatarUrl: `https://placehold.co/100x100.png?text=${values.name.charAt(0).toUpperCase()}`, // Default avatar
+      };
+      await setDoc(userDocRef, newUserDoc);
 
       toast({
         title: "Registration Successful",
-        description: "Your account has been created. Please log in.",
+        description: "Your account has been created. You can now log in.",
       });
       router.push("/auth/login");
 
