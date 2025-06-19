@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, SubscriptionPlan } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where, getDoc } from "firebase/firestore";
 import { ServicesDataTable } from "@/components/dashboard/admin/services/services-data-table";
 import { columns as defineServiceColumns } from "@/components/dashboard/admin/services/services-table-columns";
 import { ServiceFormDialog } from "@/components/dashboard/admin/services/service-form-dialog";
@@ -27,7 +27,6 @@ import {
 async function fetchServicesFromFirestore(): Promise<Service[]> {
   const servicesCol = collection(db, "services");
   const serviceSnapshot = await getDocs(servicesCol);
-  // Assuming 'slug' is the document ID
   const serviceList = serviceSnapshot.docs.map(docSnap => ({ slug: docSnap.id, ...docSnap.data() } as Service));
   return serviceList;
 }
@@ -61,7 +60,14 @@ export default function AdminServicesPage() {
       setSubscriptionPlans(fetchedPlans);
     } catch (error: any) {
       console.error("Error fetching services or plans:", error);
-      toast({ variant: "destructive", title: "Error Loading Data", description: error.message || "Could not fetch services or subscription plans." });
+      let description = "Could not fetch services or subscription plans.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Error Loading Data", description });
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +102,14 @@ export default function AdminServicesPage() {
       toast({ title: "Service Deleted", description: `Service "${serviceToDelete.name}" has been removed.` });
     } catch (error: any)      {
       console.error("Error deleting service:", error);
-      toast({ variant: "destructive", title: "Delete Failed", description: error.message || "Could not delete service." });
+      let description = "Could not delete service.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Delete Failed", description });
     } finally {
       setIsLoading(false);
       setIsDeleteDialogOpen(false);
@@ -110,33 +123,27 @@ export default function AdminServicesPage() {
 
     try {
       if (originalSlug && originalSlug !== newSlug) {
-        // Slug change means deleting old doc and creating new one
-        // Check if new slug already exists
-        const newSlugDoc = await getDocs(query(collection(db, "services"), where("name", "==", serviceData.name))); // Check by name is not good for slug, should be by doc ID (slug)
         const newDocRef = doc(db, "services", newSlug);
-        const newDocSnap = await getDocs(query(collection(db, "services"), where(doc(db, "services", newSlug).id, "==", newSlug)));
+        const newDocSnap = await getDoc(newDocRef);
 
-
-        if (!newDocSnap.empty && newDocSnap.docs[0].id !== originalSlug) {
+        if (newDocSnap.exists()) {
              toast({ variant: "destructive", title: "Duplicate Slug", description: "A service with the new slug already exists." });
              setIsLoading(false);
              throw new Error("Duplicate slug");
         }
         await deleteDoc(doc(db, "services", originalSlug));
-        await setDoc(doc(db, "services", newSlug), serviceData);
+        await setDoc(newDocRef, serviceData);
         toast({ title: "Service Updated", description: `Service "${serviceData.name}" has been successfully updated (slug changed).` });
 
-      } else if (originalSlug) { // Editing existing service, slug is the same
+      } else if (originalSlug) { // Editing existing service, slug is the same (newSlug === originalSlug)
         const serviceDocRef = doc(db, "services", originalSlug);
-        await setDoc(serviceDocRef, serviceData, { merge: true }); // Use setDoc with merge for updates if slug is ID
+        await setDoc(serviceDocRef, serviceData, { merge: true });
         toast({ title: "Service Updated", description: `Service "${serviceData.name}" has been successfully updated.` });
       } else { // Adding new service
-        // Check if slug already exists
         const serviceDocRef = doc(db, "services", newSlug);
-        const serviceDocSnap = await getDocs(query(collection(db, "services"), where(doc(db, "services", newSlug).id, "==", newSlug)));
+        const serviceDocSnap = await getDoc(serviceDocRef);
 
-
-        if(!serviceDocSnap.empty) {
+        if(serviceDocSnap.exists()) {
             toast({ variant: "destructive", title: "Duplicate Slug", description: "A service with this slug already exists." });
             setIsLoading(false);
             throw new Error("Duplicate slug");
@@ -147,8 +154,15 @@ export default function AdminServicesPage() {
       await loadData();
     } catch (error: any) {
       console.error("Error submitting service form:", error);
-       if (error.message !== "Duplicate slug") {
-         toast({ variant: "destructive", title: "Submission Failed", description: error.message || "Could not save service." });
+       if (error.message !== "Duplicate slug") { // Avoid double toast for specific handled errors
+        let description = "Could not save service.";
+        if (error.message) {
+          description += ` Message: ${error.message}`;
+        }
+        if (error.code) {
+          description += ` Code: ${error.code}`;
+        }
+         toast({ variant: "destructive", title: "Submission Failed", description });
        }
       throw error;
     } finally {
@@ -178,7 +192,7 @@ export default function AdminServicesPage() {
     <div className="container mx-auto py-2">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-headline font-bold flex items-center">
-          <Settings2 className="w-8 h-8 mr-3 text-primary" /> Service Configuration
+          <Wrench className="w-8 h-8 mr-3 text-primary" /> Service Management
         </h1>
         <Button onClick={handleAddServiceClick}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add New Service

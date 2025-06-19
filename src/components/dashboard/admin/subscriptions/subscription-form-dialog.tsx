@@ -126,9 +126,9 @@ export function SubscriptionFormDialog({ plan, onFormSubmit, isOpen, setIsOpen }
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Subscription Plan" : "Add New Subscription Plan"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Subscription" : "Add New Subscription"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Modify the details of the existing plan." : "Fill in the form to create a new plan."}
+            {isEditing ? "Modify the details of the existing subscription." : "Fill in the form to create a new subscription."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -140,9 +140,9 @@ export function SubscriptionFormDialog({ plan, onFormSubmit, isOpen, setIsOpen }
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Plan Name</FormLabel>
+                      <FormLabel>Subscription Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Basic Plan" {...field} />
+                        <Input placeholder="e.g., Basic Subscription" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -155,7 +155,7 @@ export function SubscriptionFormDialog({ plan, onFormSubmit, isOpen, setIsOpen }
                     <FormItem>
                       <FormLabel>Slug</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., basic-plan" {...field} />
+                        <Input placeholder="e.g., basic-subscription" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -168,7 +168,7 @@ export function SubscriptionFormDialog({ plan, onFormSubmit, isOpen, setIsOpen }
                     <FormItem>
                       <FormLabel>Description (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Briefly describe this plan." {...field} />
+                        <Textarea placeholder="Briefly describe this subscription." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -242,7 +242,7 @@ export function SubscriptionFormDialog({ plan, onFormSubmit, isOpen, setIsOpen }
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? "Save Changes" : "Create Plan"}
+                {isEditing ? "Save Changes" : "Create Subscription"}
               </Button>
             </DialogFooter>
           </form>

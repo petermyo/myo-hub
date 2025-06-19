@@ -57,7 +57,14 @@ export default function AdminSubscriptionsPage() {
       setPlans(fetchedPlans);
     } catch (error: any) {
       console.error("Error fetching subscription plans:", error);
-      toast({ variant: "destructive", title: "Error Loading Plans", description: error.message || "Could not fetch subscription plans." });
+      let description = "Could not fetch subscription plans.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Error Loading Plans", description });
     } finally {
       setIsLoading(false);
     }
@@ -93,10 +100,17 @@ export default function AdminSubscriptionsPage() {
     try {
       await deleteDoc(doc(db, "subscriptions", planToDelete.id));
       setPlans(prevPlans => prevPlans.filter(p => p.id !== planToDelete.id));
-      toast({ title: "Subscription Plan Deleted", description: `Plan "${planToDelete.name}" has been removed.` });
+      toast({ title: "Subscription Deleted", description: `Plan "${planToDelete.name}" has been removed.` });
     } catch (error: any) {
       console.error("Error deleting plan:", error);
-      toast({ variant: "destructive", title: "Delete Failed", description: error.message || "Could not delete plan." });
+      let description = "Could not delete plan.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Delete Failed", description });
     } finally {
       setIsLoading(false);
       setIsDeleteDialogOpen(false);
@@ -114,7 +128,7 @@ export default function AdminSubscriptionsPage() {
         if (originalPlanId && slugSnapshot.docs[0].id === originalPlanId) {
           // Editing the same plan, slug hasn't changed to conflict with another
         } else {
-          toast({ variant: "destructive", title: "Duplicate Slug", description: "A subscription plan with this slug already exists." });
+          toast({ variant: "destructive", title: "Duplicate Slug", description: "A subscription with this slug already exists." });
           setIsLoading(false);
           throw new Error("Duplicate slug");
         }
@@ -123,16 +137,23 @@ export default function AdminSubscriptionsPage() {
       if (originalPlanId) {
         const planDocRef = doc(db, "subscriptions", originalPlanId);
         await updateDoc(planDocRef, formData);
-        toast({ title: "Plan Updated", description: `Plan "${formData.name}" has been successfully updated.` });
+        toast({ title: "Subscription Updated", description: `Subscription "${formData.name}" has been successfully updated.` });
       } else {
         await addDoc(collection(db, "subscriptions"), formData);
-        toast({ title: "Plan Created", description: `Plan "${formData.name}" has been successfully added.` });
+        toast({ title: "Subscription Created", description: `Subscription "${formData.name}" has been successfully added.` });
       }
       await loadPlans();
     } catch (error: any) {
-      console.error("Error submitting subscription plan form:", error);
+      console.error("Error submitting subscription form:", error);
       if (error.message !== "Duplicate slug") { // Avoid double toast for duplicate slug
-        toast({ variant: "destructive", title: "Submission Failed", description: error.message || "Could not save subscription plan." });
+        let description = "Could not save subscription.";
+        if (error.message) {
+          description += ` Message: ${error.message}`;
+        }
+        if (error.code) {
+          description += ` Code: ${error.code}`;
+        }
+        toast({ variant: "destructive", title: "Submission Failed", description });
       }
       throw error;
     } finally {
@@ -162,10 +183,10 @@ export default function AdminSubscriptionsPage() {
     <div className="container mx-auto py-2">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-headline font-bold flex items-center">
-          <Package className="w-8 h-8 mr-3 text-primary" /> Subscription Plan Management
+          <Package className="w-8 h-8 mr-3 text-primary" /> Subscription Management
         </h1>
         <Button onClick={handleAddPlanClick}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New Plan
+          <PlusCircle className="mr-2 h-4 w-4" /> Add New Subscription
         </Button>
       </div>
        <p className="text-muted-foreground mb-6">
@@ -183,7 +204,7 @@ export default function AdminSubscriptionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently delete the subscription plan "{planToDelete?.name}".
+              This action will permanently delete the subscription "{planToDelete?.name}".
               This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -191,7 +212,7 @@ export default function AdminSubscriptionsPage() {
             <AlertDialogCancel onClick={() => { setPlanToDelete(null); setIsLoading(false); }}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeletePlan} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete Plan
+              Delete Subscription
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -52,7 +52,7 @@ export const columns = ({ onEdit, onDelete }: SubscriptionsTableColumnsProps): C
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Plan Name
+          Subscription Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
@@ -106,12 +106,12 @@ export const columns = ({ onEdit, onDelete }: SubscriptionsTableColumnsProps): C
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => onEdit(plan)}>
               <Edit className="mr-2 h-4 w-4" />
-              Edit Plan
+              Edit Subscription
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(plan)} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete Plan
+              Delete Subscription
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

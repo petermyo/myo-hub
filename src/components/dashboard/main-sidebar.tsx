@@ -15,7 +15,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, CreditCard, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench, Package } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -29,8 +29,8 @@ const navItems = [
 const adminNavItems = [
   { href: "/dashboard/admin/users", label: "User Management", icon: Users, requiredRole: "Administrator" },
   { href: "/dashboard/admin/roles", label: "Role Management", icon: ShieldCheck, requiredRole: "Administrator" },
-  { href: "/dashboard/admin/services", label: "Service Config", icon: Wrench, requiredRole: "Administrator" },
-  { href: "/dashboard/admin/subscriptions", label: "Subscription Plans", icon: Package, requiredRole: "Administrator" }, // Changed icon to Package
+  { href: "/dashboard/admin/services", label: "Service", icon: Wrench, requiredRole: "Administrator" },
+  { href: "/dashboard/admin/subscriptions", label: "Subscription", icon: Package, requiredRole: "Administrator" },
 ];
 
 const helpNavItems = [
