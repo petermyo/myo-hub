@@ -15,8 +15,10 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, CreditCard, UserCircle, Settings, LifeBuoy } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, CreditCard, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench } from "lucide-react"; // Added Wrench for Service Config
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
+
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,19 +27,26 @@ const navItems = [
 ];
 
 const adminNavItems = [
-  { href: "/dashboard/admin/users", label: "User Management", icon: Users },
-  { href: "/dashboard/admin/roles", label: "Role Management", icon: ShieldCheck },
-  { href: "/dashboard/admin/services", label: "Service Config", icon: Settings },
-  { href: "/dashboard/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/dashboard/admin/users", label: "User Management", icon: Users, requiredRole: "Administrator" }, // Keep for Admin only access for now for simplicity
+  { href: "/dashboard/admin/roles", label: "Role Management", icon: ShieldCheck, requiredRole: "Administrator" },
+  { href: "/dashboard/admin/services", label: "Service Config", icon: Wrench, requiredRole: "Administrator" },
+  { href: "/dashboard/admin/subscriptions", label: "Subscriptions", icon: CreditCard, requiredRole: "Administrator" },
 ];
 
 const helpNavItems = [
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
   { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ]
 
 export function MainSidebar() {
   const pathname = usePathname();
+  const { isAdmin } = useAuth(); // Using isAdmin from context for conditional rendering
+
+  // Filter adminNavItems based on isAdmin status
+  // For more granular control, you'd check specific permissions if 'Editor' role needs some admin items.
+  // For now, only 'Administrator' (isAdmin === true) sees these.
+  const visibleAdminNavItems = isAdmin ? adminNavItems : [];
+
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left" className="border-r">
@@ -72,31 +81,34 @@ export function MainSidebar() {
           ))}
         </SidebarMenu>
 
-        <SidebarSeparator className="my-4" />
-        
-        <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Administration</SidebarGroupLabel>
-          <SidebarMenu>
-            {adminNavItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href)}
-                  tooltip={item.label}
-                  className={cn(
-                    "justify-start",
-                    pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
-                  )}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="h-5 w-5" />
-                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        {visibleAdminNavItems.length > 0 && (
+          <>
+            <SidebarSeparator className="my-4" />
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Administration</SidebarGroupLabel>
+              <SidebarMenu>
+                {visibleAdminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.label}
+                      className={cn(
+                        "justify-start",
+                        pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
+                      )}
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="h-5 w-5" />
+                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-2 border-t">
