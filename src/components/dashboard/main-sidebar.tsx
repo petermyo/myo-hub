@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -53,7 +54,7 @@ export function MainSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
+              <Link href={item.href}>
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
@@ -80,7 +81,7 @@ export function MainSidebar() {
           <SidebarMenu>
             {adminNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                 <Link href={item.href} legacyBehavior passHref>
+                 <Link href={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
@@ -106,7 +107,7 @@ export function MainSidebar() {
          <SidebarMenu>
             {helpNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                 <Link href={item.href} legacyBehavior passHref>
+                 <Link href={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname.startsWith(item.href)}
