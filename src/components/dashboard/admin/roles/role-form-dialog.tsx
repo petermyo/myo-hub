@@ -29,31 +29,47 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
-// Predefined available permissions
-// In a real app, these might be fetched from a 'permissions' collection in Firestore
+
 const availablePermissions: Permission[] = [
   { id: 'service:content:read', name: 'Access Content Service', description: 'Allows viewing content from the content service.' },
+  { id: 'service:content:write', name: 'Manage Content Service', description: 'Allows creating and editing content.' },
   { id: 'service:files:read', name: 'Access File Service (Read)', description: 'Allows reading/downloading files.' },
   { id: 'service:files:write', name: 'Access File Service (Write)', description: 'Allows uploading/modifying files.' },
   { id: 'service:shortener:manage', name: 'Manage URL Shortener', description: 'Allows creating and managing short links.' },
   { id: 'service:randomizer:use', name: 'Use Randomizer Tool', description: 'Allows using the randomizer tool.' },
+  
   { id: 'admin:users:read', name: 'View Users', description: 'Allows viewing user list and profiles.' },
   { id: 'admin:users:create', name: 'Create Users', description: 'Allows creating new user accounts.' },
-  { id: 'admin:users:update', name: 'Update Users', description: 'Allows editing user profiles and roles (excluding sensitive actions).' },
+  { id: 'admin:users:update', name: 'Update User Profiles', description: 'Allows editing user profiles (name, email, basic info).' },
+  { id: 'admin:users:assignroles', name: 'Assign User Roles', description: 'Allows changing a user\'s role.' },
+  { id: 'admin:users:manage-status', name: 'Manage User Status', description: 'Allows activating or deactivating user accounts.' },
   { id: 'admin:users:delete', name: 'Delete Users', description: 'Allows deleting user accounts.' },
+  
   { id: 'admin:roles:read', name: 'View Roles', description: 'Allows viewing roles and their permissions.' },
-  { id: 'admin:roles:manage', name: 'Manage Roles & Permissions', description: 'Allows creating, editing, and deleting roles and assigning permissions.' },
+  { id: 'admin:roles:create', name: 'Create Roles', description: 'Allows creating new roles.' },
+  { id: 'admin:roles:update', name: 'Update Roles', description: 'Allows editing existing roles and their permissions.' },
+  { id: 'admin:roles:delete', name: 'Delete Roles', description: 'Allows deleting roles.' },
+  
   { id: 'admin:services:manage', name: 'Manage Service Configurations', description: 'Allows managing global service settings.' },
+  
   { id: 'admin:subscriptions:read', name: 'View Subscriptions', description: 'Allows viewing subscription plans.' },
   { id: 'admin:subscriptions:manage', name: 'Manage Subscriptions', description: 'Allows managing subscription plans and assigning them to users.' },
 ];
 
 
 const roleFormSchema = z.object({
-  name: z.string().min(2, { message: "Role name must be at least 2 characters." }).max(50, { message: "Role name must not exceed 50 characters." }),
+  name: z.string()
+    .min(2, { message: "Role name must be at least 2 characters." })
+    .max(50, { message: "Role name must not exceed 50 characters." })
+    .refine(val => val.toLowerCase() !== "administrator" && val.toLowerCase() !== "editor" && val.toLowerCase() !== "user", {
+      message: "Cannot use the names 'Administrator', 'Editor', or 'User' for new roles as they are protected.",
+      // This part of refine is only for new roles. Editing these roles' names is blocked elsewhere.
+    }),
   description: z.string().min(5, { message: "Description must be at least 5 characters." }).max(200, { message: "Description must not exceed 200 characters." }),
-  permissions: z.array(z.string()).min(0, { message: "Select at least one permission or none if applicable." }), // Array of permission IDs
+  permissions: z.array(z.string()).min(0, { message: "Select at least one permission or none if applicable." }),
 });
 
 type RoleFormValues = z.infer<typeof roleFormSchema>;
@@ -69,6 +85,8 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!role;
+  const protectedRoleNames = ["administrator", "editor", "user"];
+
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
@@ -94,32 +112,58 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
   }, [role, form, isOpen]);
 
   const onSubmit = async (values: RoleFormValues) => {
-    // Prevent editing the name of "Administrator", "Editor", "User" roles
-    if (isEditing && role && 
-        (role.name.toLowerCase() === "administrator" || role.name.toLowerCase() === "editor" || role.name.toLowerCase() === "user") &&
-        role.name !== values.name) {
+    setIsLoading(true);
+    // Prevent editing the name of protected roles
+    if (isEditing && role && protectedRoleNames.includes(role.name.toLowerCase()) && role.name !== values.name) {
       toast({
         variant: "destructive",
         title: "Action Not Allowed",
         description: `The name of the "${role.name}" role cannot be changed.`,
       });
       form.setValue("name", role.name); // Reset name to original
+      setIsLoading(false);
       return;
     }
 
+    // Check for duplicate role name if adding a new role or if name changed during edit
+    if (!isEditing || (isEditing && role && role.name.toLowerCase() !== values.name.toLowerCase())) {
+        const rolesCol = collection(db, "roles");
+        const q = query(rolesCol, where("name", "==", values.name));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            // Check if the duplicate found is the same role being edited (if its ID matches)
+            let isSameRoleBeingEdited = false;
+            if (isEditing && role?.id) {
+                querySnapshot.forEach(docSnap => {
+                    if (docSnap.id === role.id) {
+                        isSameRoleBeingEdited = true;
+                    }
+                });
+            }
+            if (!isSameRoleBeingEdited) {
+                toast({
+                    variant: "destructive",
+                    title: "Duplicate Role",
+                    description: `A role with the name "${values.name}" already exists.`,
+                });
+                setIsLoading(false);
+                return;
+            }
+        }
+    }
 
-    setIsLoading(true);
+
     try {
       await onFormSubmit(values, role?.id);
-      // Toast success is handled by the parent page
       setIsOpen(false);
     } catch (error: any) {
-      // Toast error is handled by the parent page
-      // No need to show another toast here unless it's a specific form validation error not caught by Zod
+      // Error toast is handled by parent, or specific ones here if needed
     } finally {
       setIsLoading(false);
     }
   };
+
+  const nameIsReadOnly = isEditing && role && protectedRoleNames.includes(role.name.toLowerCase());
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -128,6 +172,7 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
           <DialogTitle>{isEditing ? "Edit Role" : "Add New Role"}</DialogTitle>
           <DialogDescription>
             {isEditing ? "Modify the details of the existing role." : "Fill in the form to create a new role."}
+            {nameIsReadOnly && <span className="block text-sm text-yellow-600 mt-1">The name of default roles cannot be changed.</span>}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -142,12 +187,9 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
                     <Input 
                       placeholder="e.g., Content Manager" 
                       {...field} 
-                      readOnly={isEditing && (role?.name.toLowerCase() === "administrator" || role?.name.toLowerCase() === "editor" || role?.name.toLowerCase() === "user")}
+                      readOnly={nameIsReadOnly}
                     />
                   </FormControl>
-                  {(isEditing && (role?.name.toLowerCase() === "administrator" || role?.name.toLowerCase() === "editor" || role?.name.toLowerCase() === "user")) && 
-                    <p className="text-xs text-muted-foreground">The name of default roles (Administrator, Editor, User) cannot be changed.</p>
-                  }
                   <FormMessage />
                 </FormItem>
               )}

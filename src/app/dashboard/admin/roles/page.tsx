@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import type { Role } from "@/types";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, query, where } from "firebase/firestore";
 import { RolesDataTable } from "@/components/dashboard/admin/roles/roles-data-table";
 import { columns as defineRoleColumns } from "@/components/dashboard/admin/roles/roles-table-columns";
 import { RoleFormDialog } from "@/components/dashboard/admin/roles/role-form-dialog";
@@ -29,6 +29,15 @@ async function fetchRolesFromFirestore(): Promise<Role[]> {
   const roleList = roleSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Role));
   return roleList;
 }
+
+// Helper function to check if a role is in use
+async function isRoleInUse(roleName: string): Promise<boolean> {
+  const usersCol = collection(db, "users");
+  const q = query(usersCol, where("role", "==", roleName));
+  const querySnapshot = await getDocs(q);
+  return !querySnapshot.empty;
+}
+
 
 export default function AdminRolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -67,26 +76,49 @@ export default function AdminRolesPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteRoleAttempt = (role: Role) => {
-    // Basic protection: prevent deleting "Administrator" role
-    if (role.name.toLowerCase() === "administrator") {
-        toast({ variant: "destructive", title: "Action Not Allowed", description: "The Administrator role cannot be deleted." });
+  const handleDeleteRoleAttempt = async (role: Role) => {
+    const protectedRoles = ["administrator", "editor", "user"];
+    if (protectedRoles.includes(role.name.toLowerCase())) {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: `The "${role.name}" role cannot be deleted.` });
         return;
     }
+
+    setIsLoading(true);
+    const roleInUse = await isRoleInUse(role.name);
+    setIsLoading(false);
+
+    if (roleInUse) {
+        toast({ variant: "destructive", title: "Role In Use", description: `The "${role.name}" role is currently assigned to users and cannot be deleted.` });
+        return;
+    }
+
     setRoleToDelete(role);
     setIsDeleteDialogOpen(true);
   };
 
   const confirmDeleteRole = async () => {
     if (!roleToDelete || !roleToDelete.id) return;
-    if (roleToDelete.name.toLowerCase() === "administrator") {
-        toast({ variant: "destructive", title: "Action Not Allowed", description: "The Administrator role cannot be deleted." });
+    
+    // Double check protected roles (already checked in handleDeleteRoleAttempt, but good for safety)
+    const protectedRoles = ["administrator", "editor", "user"];
+    if (protectedRoles.includes(roleToDelete.name.toLowerCase())) {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: `The "${roleToDelete.name}" role cannot be deleted.` });
+        setIsDeleteDialogOpen(false);
+        setRoleToDelete(null);
+        return;
+    }
+    
+    // Double check if role is in use (already checked, but good for safety)
+    setIsLoading(true); // Indicate loading for the delete operation
+    const roleInUse = await isRoleInUse(roleToDelete.name);
+    if (roleInUse) {
+        toast({ variant: "destructive", title: "Role In Use", description: `The "${roleToDelete.name}" role is currently assigned to users and cannot be deleted.` });
+        setIsLoading(false);
         setIsDeleteDialogOpen(false);
         setRoleToDelete(null);
         return;
     }
 
-    setIsLoading(true);
     try {
       await deleteDoc(doc(db, "roles", roleToDelete.id));
       setRoles(prevRoles => prevRoles.filter(r => r.id !== roleToDelete.id));
@@ -152,7 +184,7 @@ export default function AdminRolesPage() {
         </Button>
       </div>
       <p className="text-muted-foreground mb-6">
-        Define and manage user roles and their associated permissions.
+        Define and manage user roles and their associated permissions. Default roles (Administrator, Editor, User) cannot be deleted or have their names changed. Roles cannot be deleted if they are in use by any user.
       </p>
       <RolesDataTable columns={columns} data={roles} />
       <RoleFormDialog
@@ -167,11 +199,11 @@ export default function AdminRolesPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action will permanently delete the role "{roleToDelete?.name}".
-              This cannot be undone. Users currently assigned this role may lose access.
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setRoleToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setRoleToDelete(null); setIsLoading(false); }}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteRole} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete Role

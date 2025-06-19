@@ -13,7 +13,8 @@ interface AuthContextType {
   currentUser: User | null;
   firebaseUser: FirebaseUserType | null;
   loading: boolean;
-  isAdmin: boolean;
+  isAdmin: boolean; // True if role is "Administrator"
+  // Add other role checks if needed, e.g., isEditor
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,43 +27,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setLoading(true); // Set loading true at the start of auth state processing
+      setLoading(true); 
       setFirebaseUser(fbUser);
       if (fbUser) {
         const userDocRef = doc(db, "users", fbUser.uid);
         try {
           const userDocSnap = await getDoc(userDocRef);
+          let appUser: User;
           if (userDocSnap.exists()) {
-            const appUser = { uid: fbUser.uid, ...userDocSnap.data() } as User;
-            setCurrentUser(appUser);
-            setIsAdmin(appUser.role === "Administrator");
-            await updateDoc(userDocRef, { // Ensure this is awaited
+            appUser = { uid: fbUser.uid, ...userDocSnap.data() } as User;
+            // Update lastLogin if user document exists
+            await updateDoc(userDocRef, { 
               lastLogin: new Date().toISOString()
             });
+            // Refresh appUser with updated lastLogin if needed, or assume it's reflected in subsequent reads
+            appUser.lastLogin = new Date().toISOString(); 
           } else {
             console.warn("User document not found in Firestore for UID:", fbUser.uid, "Creating one.");
+            const defaultRole = "User"; // New users default to "User" role
             const newUserProfile: User = {
               uid: fbUser.uid,
-              name: fbUser.displayName || "User",
+              name: fbUser.displayName || "New User",
               email: fbUser.email || "unknown@example.com",
-              role: "User",
+              role: defaultRole,
               status: "active",
               createdAt: new Date().toISOString(),
               avatarUrl: fbUser.photoURL || `https://placehold.co/100x100.png?text=${(fbUser.displayName || "U").charAt(0)}`,
               enabledServices: [],
               lastLogin: new Date().toISOString(),
             };
-            await setDoc(userDocRef, newUserProfile); // Ensure this is awaited
-            setCurrentUser(newUserProfile);
-            setIsAdmin(newUserProfile.role === "Administrator");
+            await setDoc(userDocRef, newUserProfile);
+            appUser = newUserProfile;
           }
+          setCurrentUser(appUser);
+          setIsAdmin(appUser.role === "Administrator");
         } catch (error) {
             console.error("Error fetching or updating user document:", error);
+            // Fallback to basic user from Firebase Auth if Firestore interaction fails
             const basicUser: User = {
                 uid: fbUser.uid,
                 email: fbUser.email || "unknown@example.com",
                 name: fbUser.displayName || "User",
-                role: "User",
+                role: "User", // Default role on error
                 status: "active",
                 createdAt: new Date().toISOString(),
                 enabledServices: [],
@@ -71,12 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setCurrentUser(basicUser);
             setIsAdmin(false);
         } finally {
-          setLoading(false); // Set loading to false only after all async operations for a logged-in user are done
+          setLoading(false);
         }
       } else {
         setCurrentUser(null);
         setIsAdmin(false);
-        setLoading(false); // Set loading to false if no user
+        setLoading(false);
       }
     });
 

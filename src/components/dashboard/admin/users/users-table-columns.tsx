@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react";
 import { format } from 'date-fns';
-import { useAuth } from "@/contexts/auth-context"; // Import useAuth
+import { useAuth } from "@/contexts/auth-context";
 
 interface UsersTableColumnsProps {
   onEdit: (user: User) => void;
@@ -27,7 +27,7 @@ interface UsersTableColumnsProps {
 
 export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsProps): ColumnDef<User>[] => {
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { currentUser } = useAuth(); // Get current authenticated user's details
+  const { currentUser: performingUser } = useAuth(); // Get current authenticated user's details
 
   return [
     {
@@ -92,15 +92,22 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
       header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
+        let badgeClass = "";
+        switch (status) {
+          case "active":
+            badgeClass = "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700";
+            break;
+          case "inactive":
+            badgeClass = "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700";
+            break;
+          case "pending":
+            badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700";
+            break;
+          default:
+            badgeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-700";
+        }
         return (
-          <Badge
-            variant={status === "active" ? "default" : status === "pending" ? "secondary" : "destructive"}
-            className={
-                status === "active" ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700" :
-                status === "pending" ? "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700" :
-                "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700"
-            }
-          >
+          <Badge variant={"outline"} className={badgeClass}>
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         );
@@ -134,14 +141,22 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
       id: "actions",
       cell: ({ row }) => {
         const user = row.original;
-        const performingUserIsAdmin = currentUser?.role === "Administrator";
-        // An editor should not be able to delete an Administrator
-        // And an editor should not be able to delete themselves (though this form is for other users)
-        // And an editor cannot delete other editors or administrators
-        const canDelete = performingUserIsAdmin && user.role !== "Administrator";
-        
-        // Editors can edit users unless the target user is an Administrator
-        const canEdit = performingUserIsAdmin || (currentUser?.role === "Editor" && user.role !== "Administrator");
+        const isSelf = performingUser?.uid === user.uid;
+        const performingUserRole = performingUser?.role;
+
+        let canEdit = false;
+        let canDelete = false;
+
+        if (performingUserRole === "Administrator") {
+          canEdit = true;
+          canDelete = !isSelf; // Admin cannot delete self
+        } else if (performingUserRole === "Editor") {
+          // Editors can edit users unless the target user is an Administrator or another Editor.
+          // Editors cannot edit themselves through this table (profile page is for that).
+          canEdit = !isSelf && user.role !== "Administrator" && user.role !== "Editor";
+          // Editors cannot delete any users.
+          canDelete = false;
+        }
 
         return (
           <DropdownMenu>

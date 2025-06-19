@@ -6,13 +6,14 @@ import { columns as defineColumns } from "@/components/dashboard/admin/users/use
 import { UsersDataTable } from "@/components/dashboard/admin/users/users-data-table";
 import { UserFormDialog } from "@/components/dashboard/admin/users/user-form-dialog";
 import { Button } from "@/components/ui/button";
-import type { User } from "@/types";
+import type { User, Role as AppRole } from "@/types";
 import { PlusCircle, Users as UsersIcon, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,8 +33,17 @@ async function fetchUsersFromFirestore(): Promise<User[]> {
   return userList;
 }
 
+async function fetchRolesFromFirestore(): Promise<AppRole[]> {
+  const rolesCol = collection(db, "roles");
+  const roleSnapshot = await getDocs(rolesCol);
+  const roleList = roleSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AppRole));
+  return roleList;
+}
+
+
 export default function AdminUsersPage() {
   const [data, setData] = useState<User[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -41,23 +51,28 @@ export default function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { toast } = useToast();
+  const { currentUser: performingUser, isAdmin: performingUserIsAdmin } = useAuth();
 
-  const loadUsers = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const users = await fetchUsersFromFirestore();
+      const [users, roles] = await Promise.all([
+        fetchUsersFromFirestore(),
+        fetchRolesFromFirestore()
+      ]);
       setData(users);
+      setAvailableRoles(roles);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch users." });
+      console.error("Error fetching users or roles:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch users or roles." });
     } finally {
       setIsLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    loadData();
+  }, [loadData]);
 
   const handleAddUserClick = () => {
     setSelectedUser(null);
@@ -65,30 +80,54 @@ export default function AdminUsersPage() {
   };
   
   const handleEditUser = (user: User) => {
+    // Prevent editors from editing Administrators
+    if (performingUser?.role === "Editor" && user.role === "Administrator") {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: "Editors cannot edit Administrator accounts." });
+        return;
+    }
     setSelectedUser(user);
     setIsFormOpen(true);
   };
 
   const handleDeleteUserAttempt = (user: User) => {
+    // Prevent deleting oneself
+    if (user.uid === performingUser?.uid) {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: "You cannot delete your own account." });
+        return;
+    }
+    // Prevent editors from deleting Administrators or other Editors
+    if (performingUser?.role === "Editor" && (user.role === "Administrator" || user.role === "Editor")) {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: "Editors cannot delete Administrator or other Editor accounts." });
+        return;
+    }
+    // Only Administrators can delete Administrator accounts (other than themselves)
+    if (user.role === "Administrator" && !performingUserIsAdmin) {
+         toast({ variant: "destructive", title: "Action Not Allowed", description: "Only Administrators can delete other Administrator accounts." });
+        return;
+    }
+
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };
 
   const confirmDeleteUser = async () => {
     if (!userToDelete || !userToDelete.uid) return;
-    setIsLoading(true); // Use page-level loading state for delete operation
-    try {
-      // Delete user document from Firestore
-      await deleteDoc(doc(db, "users", userToDelete.uid));
-      
-      // IMPORTANT: Deleting a Firebase Auth user client-side for *another user* is NOT recommended or typically possible
-      // without Admin SDK privileges (which are not available in the client).
-      // A Firebase Function triggered by the Firestore document deletion (or an explicit call)
-      // is the robust way to delete the corresponding Firebase Auth user.
-      // The code to attempt auth.deleteUser() is omitted here as it's for the *current* user
-      // and would require re-authentication for the user being deleted if it were them.
-      console.warn(`Firestore document for user ${userToDelete.uid} deleted. Corresponding Firebase Auth user record must be deleted separately (e.g., via Admin SDK / Firebase Function).`);
+    
+    // Re-check permissions before actual deletion
+    if (userToDelete.uid === performingUser?.uid || 
+        (performingUser?.role === "Editor" && (userToDelete.role === "Administrator" || userToDelete.role === "Editor")) ||
+        (userToDelete.role === "Administrator" && !performingUserIsAdmin)
+    ) {
+        toast({ variant: "destructive", title: "Action Not Allowed", description: "Permission to delete this user was denied." });
+        setIsDeleteDialogOpen(false);
+        setUserToDelete(null);
+        return;
+    }
 
+    setIsLoading(true);
+    try {
+      await deleteDoc(doc(db, "users", userToDelete.uid));
+      console.warn(`Firestore document for user ${userToDelete.uid} deleted. Corresponding Firebase Auth user record must be deleted separately (e.g., via Admin SDK / Firebase Function).`);
       setData(prevData => prevData.filter(u => u.uid !== userToDelete.uid));
       toast({ title: "User Document Deleted", description: `Firestore record for ${userToDelete.name} has been removed.` });
     } catch (error: any) {
@@ -101,23 +140,21 @@ export default function AdminUsersPage() {
     }
   };
 
-
   const handleFormSubmit = async (formData: Partial<User> & { password?: string }, originalUserUid?: string) => {
-    // formData contains: uid (if editing), name, email, role, and password (if adding)
-    // It's a Partial<User> because UserFormDialog only sends fields it manages.
     setIsLoading(true);
     try {
       if (originalUserUid) { // Editing existing user
+        const userToEdit = data.find(u => u.uid === originalUserUid);
+        if (performingUser?.role === "Editor" && userToEdit?.role === "Administrator") {
+            throw new Error("Editors cannot modify Administrator accounts.");
+        }
+        
         const userDocRef = doc(db, "users", originalUserUid);
-        // Only update fields managed by the form: name, email, role.
-        // Other fields like createdAt, lastLogin, avatarUrl, enabledServices, status are not changed here
-        // to prevent accidental overwrites if they are managed elsewhere or not part of this specific form.
-        // Note: Changing email in Firebase Auth for another user is complex from client-side and usually requires Admin SDK.
-        // This update only affects the Firestore email field.
         const fieldsToUpdate: Partial<User> = {
             name: formData.name,
-            email: formData.email,
+            // email: formData.email, // Email change handled by Firebase Auth, then synced
             role: formData.role,
+            status: formData.status // Assuming status is part of the form
         };
         await updateDoc(userDocRef, fieldsToUpdate);
         toast({ title: "User Updated", description: `${formData.name} has been successfully updated.` });
@@ -128,24 +165,29 @@ export default function AdminUsersPage() {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const firebaseUser = userCredential.user;
         
-        const newUserDoc: Omit<User, 'password' | 'confirmPassword' | 'lastLogin' | 'subscriptionPlanId'> = {
+        const newUserDoc: User = {
           uid: firebaseUser.uid,
           name: formData.name || "Unnamed User",
-          email: firebaseUser.email!, // Email is guaranteed from createUserWithEmailAndPassword
+          email: firebaseUser.email!,
           role: formData.role || "User",
-          status: "active", // Default status for new users created by admin
+          status: formData.status || "active",
           createdAt: new Date().toISOString(),
-          enabledServices: [], // Default for new users
+          lastLogin: new Date().toISOString(),
+          enabledServices: [],
           avatarUrl: `https://placehold.co/100x100.png?text=${(formData.name || "U").charAt(0).toUpperCase()}`,
         };
         await setDoc(doc(db, "users", firebaseUser.uid), newUserDoc);
         toast({ title: "User Created", description: `${newUserDoc.name} has been successfully added.` });
       }
-      await loadUsers(); // Refresh data
+      await loadData(); // Refresh data
     } catch (error: any) {
         console.error("Error submitting user form:", error);
-        // UserFormDialog handles its own toast on error by re-throwing
-        throw error;
+        toast({
+          variant: "destructive",
+          title: "Operation Failed",
+          description: error.message || `Could not ${originalUserUid ? 'update' : 'create'} user.`,
+        });
+        throw error; // Re-throw to allow form dialog to handle its own loading state
     } finally {
       setIsLoading(false);
     }
@@ -154,11 +196,11 @@ export default function AdminUsersPage() {
   const columns = defineColumns({ 
     onEdit: handleEditUser, 
     onDelete: handleDeleteUserAttempt, 
-    onViewDetails: (user) => console.log("View details for:", user.name) // Placeholder for view details
+    onViewDetails: (user) => console.log("View details for:", user.name) 
   });
 
 
-  if (isLoading && data.length === 0) { // Initial load skeleton
+  if (isLoading && data.length === 0) { 
     return (
       <div className="container mx-auto py-2 space-y-6">
         <div className="flex justify-between items-center">
@@ -167,10 +209,6 @@ export default function AdminUsersPage() {
         </div>
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
-        <div className="flex justify-end gap-2">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-24" />
-        </div>
       </div>
     );
   }
@@ -181,32 +219,38 @@ export default function AdminUsersPage() {
         <h1 className="text-3xl font-headline font-bold flex items-center">
           <UsersIcon className="w-8 h-8 mr-3 text-primary" /> User Management
         </h1>
-        <Button onClick={handleAddUserClick}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add User
-        </Button>
+        {performingUserIsAdmin && ( // Only Admins can add users
+          <Button onClick={handleAddUserClick}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add User
+          </Button>
+        )}
       </div>
       <p className="text-muted-foreground mb-6">
-        View, manage, and edit user accounts. You can assign roles and manage access.
+        View, manage, and edit user accounts. Assign roles and manage access.
       </p>
       <UsersDataTable columns={columns} data={data} />
-      <UserFormDialog
-        user={selectedUser}
-        onFormSubmit={handleFormSubmit}
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-      />
+      {isFormOpen && (
+        <UserFormDialog
+            user={selectedUser}
+            onFormSubmit={handleFormSubmit}
+            isOpen={isFormOpen}
+            setIsOpen={setIsFormOpen}
+            availableRoles={availableRoles.map(r => ({id: r.name, name: r.name}))} // Pass roles as {id, name}
+            currentUserRole={performingUser?.role}
+        />
+      )}
        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user&apos;s Firestore document
+              This action will permanently delete the user&apos;s Firestore document
               for {userToDelete?.name}. Deleting the corresponding Firebase Authentication user record
-              must be done separately, typically using the Firebase Admin SDK (e.g., via a Firebase Function).
+              must be done separately, typically using the Firebase Admin SDK.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setUserToDelete(null); setIsLoading(false);}}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteUser} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete Firestore Record
@@ -217,4 +261,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

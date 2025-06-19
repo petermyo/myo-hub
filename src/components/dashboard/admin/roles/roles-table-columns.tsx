@@ -76,7 +76,8 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
     id: "actions",
     cell: ({ row }) => {
       const role = row.original;
-      const isProtectedRole = role.name.toLowerCase() === "administrator" || role.name.toLowerCase() === "editor" || role.name.toLowerCase() === "user";
+      const protectedRoleNames = ["administrator", "editor", "user"];
+      const isProtectedRole = protectedRoleNames.includes(role.name.toLowerCase());
 
 
       return (
@@ -93,7 +94,7 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
               <Edit className="mr-2 h-4 w-4" />
               Edit Role
             </DropdownMenuItem>
-            {!isProtectedRole && ( // Only allow deleting non-protected roles
+            {!isProtectedRole && ( 
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onDelete(role)} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
@@ -105,7 +106,7 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
             {isProtectedRole && (
                  <DropdownMenuItem disabled>
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Cannot Delete
+                    Cannot Delete (Protected Role)
                  </DropdownMenuItem>
             )}
           </DropdownMenuContent>

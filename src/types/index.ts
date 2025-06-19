@@ -33,7 +33,7 @@ export interface Permission {
 
 export interface Role {
   id?: string; // Firestore document ID (optional before creation)
-  name: string; // Display name, e.g., "Administrator", "Editor"
+  name: string; // Display name, e.g., "Administrator", "Editor", "User"
   description: string;
   permissions: string[]; // Array of Permission IDs, e.g., ['service:content:read', 'admin:users:manage']
 }

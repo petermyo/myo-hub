@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -30,25 +29,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { User } from "@/types"; // Role type might be needed if complex
+import type { User } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-// Dummy roles data - in a real app, this might come from Firestore or config
-const availableRoles = [
-  { id: "Administrator", name: "Administrator" },
-  { id: "Editor", name: "Editor" },
-  { id: "User", name: "User" },
-];
+interface RoleOption {
+  id: string;
+  name: string;
+}
 
 const userFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   role: z.string().min(1, { message: "Please select a role." }),
+  status: z.enum(['active', 'inactive', 'pending'], { required_error: "Please select a status."}),
 });
 
-// Schema for adding a new user (password is required)
 const newUserFormSchema = userFormSchemaBase.extend({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string(),
@@ -57,19 +54,20 @@ const newUserFormSchema = userFormSchemaBase.extend({
   path: ["confirmPassword"],
 });
 
-// Schema for editing an existing user (password is optional or not present)
 const editUserFormSchema = userFormSchemaBase;
 
 
 interface UserFormDialogProps {
-  user?: User | null; // User object for editing, null/undefined for adding
+  user?: User | null;
   triggerButton?: ReactNode;
-  onFormSubmit: (values: User, originalUserUid?: string) => Promise<void>;
+  onFormSubmit: (values: Partial<User> & { password?: string }, originalUserUid?: string) => Promise<void>;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  availableRoles: RoleOption[];
+  currentUserRole?: string; // Role of the user performing the action
 }
 
-export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setIsOpen }: UserFormDialogProps) {
+export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setIsOpen, availableRoles, currentUserRole }: UserFormDialogProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!user;
@@ -80,23 +78,25 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setI
       name: "",
       email: "",
       role: "",
+      status: "active",
       password: "",
       confirmPassword: "",
     },
   });
 
   useEffect(() => {
-    if (isOpen) { // Reset form when dialog opens
+    if (isOpen) { 
         if (user) {
         form.reset({
             name: user.name,
             email: user.email,
             role: user.role,
-            password: "", // Don't prefill password for editing
+            status: user.status || "active",
+            password: "", 
             confirmPassword: "",
         });
         } else {
-        form.reset({ name: "", email: "", role: "", password: "", confirmPassword: ""});
+        form.reset({ name: "", email: "", role: "", status: "active", password: "", confirmPassword: ""});
         }
     }
   }, [user, form, isOpen]);
@@ -105,21 +105,28 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setI
   async function onSubmit(values: z.infer<typeof userFormSchemaBase & { password?: string; confirmPassword?: string }>) {
     setIsLoading(true);
     try {
-      const submittedUser: User = {
-        uid: user?.uid || "", // Will be set by Firebase Auth on creation if new
+      // If editing, and the current user is an "Editor", they cannot change a user's role to "Administrator"
+      // or change an "Administrator"'s role to something else.
+      if (isEditing && currentUserRole === "Editor") {
+        if (values.role === "Administrator" && user?.role !== "Administrator") {
+          throw new Error("Editors cannot assign the Administrator role.");
+        }
+        if (user?.role === "Administrator" && values.role !== "Administrator") {
+          throw new Error("Editors cannot change the role of an Administrator.");
+        }
+      }
+
+      const submittedUser: Partial<User> & { password?: string } = {
+        uid: user?.uid || "", 
         name: values.name,
-        email: values.email,
+        email: values.email, // Email is read-only in form for edits, but submitted
         role: values.role,
-        status: user?.status || 'active', // Default for new, preserve for existing
-        createdAt: user?.createdAt || new Date().toISOString(),
+        status: values.status,
         // Only include password if it's a new user form
         ...( !isEditing && values.password && { password: values.password }),
       };
-      await onFormSubmit(submittedUser, user?.uid); // Pass original UID for edits
-      toast({
-        title: user ? "User Updated" : "User Created",
-        description: `${values.name} has been successfully ${user ? 'updated' : 'added'}.`,
-      });
+      await onFormSubmit(submittedUser, user?.uid);
+      // Success toast is handled by parent page
       setIsOpen(false);
     } catch (error: any) {
       console.error("User form submission error:", error);
@@ -132,6 +139,12 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setI
       setIsLoading(false);
     }
   }
+
+  const isRoleFieldDisabled = isEditing && currentUserRole === "Editor" && (user?.role === "Administrator" || user?.role === "Editor");
+  const filteredRolesForEditor = availableRoles.filter(
+    (roleOpt) => !(currentUserRole === "Editor" && roleOpt.id === "Administrator")
+  );
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -167,7 +180,7 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setI
                   <FormControl>
                     <Input placeholder="user@example.com" {...field} type="email" readOnly={isEditing} />
                   </FormControl>
-                  {isEditing && <p className="text-xs text-muted-foreground">Email cannot be changed after creation through this form.</p>}
+                  {isEditing && <p className="text-xs text-muted-foreground">Email cannot be changed after creation through this form. Firebase Auth user email needs separate handling for changes.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -178,18 +191,45 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setI
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                    disabled={isRoleFieldDisabled}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableRoles.map((roleOpt) => (
-                        <SelectItem key={roleOpt.id} value={roleOpt.id}>
+                      {(currentUserRole === "Editor" ? filteredRolesForEditor : availableRoles).map((roleOpt) => (
+                        <SelectItem key={roleOpt.id} value={roleOpt.id} disabled={isEditing && currentUserRole === "Editor" && user?.role === "Administrator" && roleOpt.id !== "Administrator"}>
                           {roleOpt.name}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                  {isRoleFieldDisabled && <p className="text-xs text-muted-foreground">Editors cannot change the role of Administrators or other Editors.</p>}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
