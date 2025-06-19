@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
 
 export default function SettingsPage() {
@@ -12,18 +13,18 @@ export default function SettingsPage() {
         </div>
       </div>
       
-      <Card>
+      <Card className="shadow-lg rounded-xl">
         <CardHeader>
-          <CardTitle>Preferences</CardTitle>
+          <CardTitle className="text-2xl">Preferences</CardTitle>
+          <CardDescription>
+            Account settings options will be available here. This may include preferences for notifications, theme settings (light/dark mode), language, or security settings like password changes and two-factor authentication.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            Account settings options will be available here. This may include preferences for notifications, theme settings (light/dark mode), language, or security settings like password changes and two-factor authentication.
-          </p>
-          <div className="mt-6 p-8 border border-dashed rounded-lg text-center">
+          <div className="mt-4 p-8 border border-dashed rounded-lg text-center bg-muted/20">
             <SettingsIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-semibold">Settings Options Coming Soon</p>
-            <p className="text-sm text-muted-foreground">Detailed account settings will be configurable here.</p>
+            <p className="text-xl font-semibold text-foreground/80">Settings Options Coming Soon</p>
+            <p className="text-sm text-muted-foreground mt-1">Detailed account settings will be configurable here.</p>
           </div>
         </CardContent>
       </Card>
