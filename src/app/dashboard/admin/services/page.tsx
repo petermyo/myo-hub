@@ -64,8 +64,9 @@ export default function AdminServicesPage() {
       if (error.message) {
         description += ` Message: ${error.message}`;
       }
-      if (error.code) {
-        description += ` Code: ${error.code}`;
+      if (error.code) { // Log Firebase specific error code
+        description += ` Firebase Code: ${error.code}`;
+        console.error("Firebase error details:", error);
       }
       toast({ variant: "destructive", title: "Error Loading Data", description });
     } finally {
@@ -106,8 +107,9 @@ export default function AdminServicesPage() {
       if (error.message) {
         description += ` Message: ${error.message}`;
       }
-      if (error.code) {
-        description += ` Code: ${error.code}`;
+      if (error.code) { // Log Firebase specific error code
+        description += ` Firebase Code: ${error.code}`;
+        console.error("Firebase error details:", error);
       }
       toast({ variant: "destructive", title: "Delete Failed", description });
     } finally {
@@ -159,8 +161,9 @@ export default function AdminServicesPage() {
         if (error.message) {
           description += ` Message: ${error.message}`;
         }
-        if (error.code) {
-          description += ` Code: ${error.code}`;
+        if (error.code) { // Log Firebase specific error code
+          description += ` Firebase Code: ${error.code}`;
+          console.error("Firebase error details:", error);
         }
          toast({ variant: "destructive", title: "Submission Failed", description });
        }
@@ -232,3 +235,4 @@ export default function AdminServicesPage() {
     </div>
   );
 }
+
