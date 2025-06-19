@@ -3,12 +3,11 @@
 
 import type { User as FirebaseUserType } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, DocumentData } from "firebase/firestore";
-import { useRouter, usePathname } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
 import type { ReactNode} from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import type { User } from "@/types"; // Your app's User type
+import type { User } from "@/types";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -24,7 +23,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  // router and pathname are not directly needed by AuthProvider for its own rendering logic anymore
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -38,12 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAdmin(appUser.role === "Administrator");
         } else {
           console.warn("User document not found in Firestore for UID:", user.uid);
-          // Create a default user profile if none exists, ensuring all User fields are met
-          const defaultUser: User = { 
+          const defaultUser: User = {
             uid: user.uid,
             email: user.email || "",
             name: user.displayName || "User",
-            role: "User", 
+            role: "User",
             status: "active",
             createdAt: new Date().toISOString(),
             enabledServices: [],
@@ -62,9 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // AuthContext.Provider must always wrap children.
-  // Consuming components will use the `loading` state from the context
-  // to determine their own rendering (e.g., show a spinner or skeleton).
   return (
     <AuthContext.Provider value={{ currentUser, firebaseUser, loading, isAdmin }}>
       {children}
