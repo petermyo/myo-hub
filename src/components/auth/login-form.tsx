@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -111,15 +112,15 @@ export function LoginForm() {
       </CardContent>
       <CardFooter className="flex flex-col gap-4">
         <div className="text-sm text-muted-foreground text-center">
-          <Link href="/auth/forgot-password" passHref legacyBehavior>
-            <a className="font-medium text-primary hover:underline">Forgot password?</a>
+          <Link href="/auth/forgot-password" className="font-medium text-primary hover:underline">
+            Forgot password?
           </Link>
         </div>
         <Separator />
         <div className="text-sm text-muted-foreground text-center">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/register" passHref legacyBehavior>
-            <a className="font-medium text-primary hover:underline">Sign up</a>
+          <Link href="/auth/register" className="font-medium text-primary hover:underline">
+            Sign up
           </Link>
         </div>
       </CardFooter>

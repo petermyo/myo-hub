@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -137,8 +138,8 @@ export function RegisterForm() {
         <Separator />
         <div className="text-sm text-muted-foreground text-center">
           Already have an account?{" "}
-          <Link href="/auth/login" passHref legacyBehavior>
-            <a className="font-medium text-primary hover:underline">Sign in</a>
+          <Link href="/auth/login" className="font-medium text-primary hover:underline">
+            Sign in
           </Link>
         </div>
       </CardFooter>
