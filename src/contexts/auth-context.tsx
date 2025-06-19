@@ -9,8 +9,7 @@ import type { ReactNode} from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import type { User } from "@/types"; // Your app's User type
-import { Skeleton } from "@/components/ui/skeleton";
-
+// Skeleton import is no longer needed here for the provider's direct rendering
 
 interface AuthContextType {
   currentUser: User | null;
@@ -26,16 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-
+  // router and pathname are not directly needed by AuthProvider for its own rendering logic anymore
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
-        // User is signed in, see docs for a list of available properties
-        // https://firebase.google.com/docs/reference/js/firebase.User
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
@@ -43,44 +38,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setCurrentUser(appUser);
           setIsAdmin(appUser.role === "Administrator");
         } else {
-          // This case should ideally not happen if user data is created on registration
           console.warn("User document not found in Firestore for UID:", user.uid);
-          // Fallback: create a minimal user object or sign out
-          setCurrentUser({
+          const defaultUser: User = { // Ensure User type is fully satisfied
             uid: user.uid,
             email: user.email || "",
             name: user.displayName || "User",
-            role: "User", // default role
+            role: "User", 
             status: "active",
             createdAt: new Date().toISOString(),
-          });
+            enabledServices: [],
+            avatarUrl: `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`
+          };
+          setCurrentUser(defaultUser);
           setIsAdmin(false);
         }
       } else {
-        // User is signed out
         setCurrentUser(null);
         setIsAdmin(false);
       }
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
-  // Handle route protection while loading
-  if (loading && (pathname.startsWith('/dashboard') || pathname.startsWith('/auth'))) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-             <Skeleton className="h-20 w-full max-w-md mb-4" />
-             <Skeleton className="h-10 w-full max-w-md mb-2" />
-             <Skeleton className="h-10 w-full max-w-md mb-6" />
-             <Skeleton className="h-10 w-full max-w-md" />
-        </div>
-    );
-  }
-
-
+  // AuthContext.Provider must always wrap children.
+  // Consuming components will use the `loading` state from the context
+  // to determine their own rendering (e.g., show a spinner or skeleton).
   return (
     <AuthContext.Provider value={{ currentUser, firebaseUser, loading, isAdmin }}>
       {children}
