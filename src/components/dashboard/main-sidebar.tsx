@@ -15,7 +15,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, CreditCard, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench } from "lucide-react"; // Added Wrench for Service Config
+import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, CreditCard, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -27,10 +27,10 @@ const navItems = [
 ];
 
 const adminNavItems = [
-  { href: "/dashboard/admin/users", label: "User Management", icon: Users, requiredRole: "Administrator" }, // Keep for Admin only access for now for simplicity
+  { href: "/dashboard/admin/users", label: "User Management", icon: Users, requiredRole: "Administrator" },
   { href: "/dashboard/admin/roles", label: "Role Management", icon: ShieldCheck, requiredRole: "Administrator" },
   { href: "/dashboard/admin/services", label: "Service Config", icon: Wrench, requiredRole: "Administrator" },
-  { href: "/dashboard/admin/subscriptions", label: "Subscriptions", icon: CreditCard, requiredRole: "Administrator" },
+  { href: "/dashboard/admin/subscriptions", label: "Subscription Plans", icon: Package, requiredRole: "Administrator" }, // Changed icon to Package
 ];
 
 const helpNavItems = [
@@ -40,11 +40,8 @@ const helpNavItems = [
 
 export function MainSidebar() {
   const pathname = usePathname();
-  const { isAdmin } = useAuth(); // Using isAdmin from context for conditional rendering
+  const { isAdmin } = useAuth(); 
 
-  // Filter adminNavItems based on isAdmin status
-  // For more granular control, you'd check specific permissions if 'Editor' role needs some admin items.
-  // For now, only 'Administrator' (isAdmin === true) sees these.
   const visibleAdminNavItems = isAdmin ? adminNavItems : [];
 
 

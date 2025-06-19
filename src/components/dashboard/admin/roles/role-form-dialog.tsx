@@ -49,25 +49,25 @@ export const availablePermissions: Permission[] = [
   { id: 'role:update', name: 'Update Roles', description: 'Allows editing existing roles and their permissions.', category: 'Role Management' },
   { id: 'role:delete', name: 'Delete Roles', description: 'Allows deleting roles (except protected ones).', category: 'Role Management' },
 
-  // Service Management (for configuring services themselves, not user access to them)
-  { id: 'service:config:create', name: 'Create Service Configurations', description: 'Allows adding new services or service types to the platform.', category: 'Service Management' },
-  { id: 'service:config:read', name: 'Read Service Configurations', description: 'Allows viewing global settings of available services.', category: 'Service Management' },
-  { id: 'service:config:update', name: 'Update Service Configurations', description: 'Allows modifying global settings of available services.', category: 'Service Management' },
-  { id: 'service:config:delete', name: 'Delete Service Configurations', description: 'Allows removing services or service types from the platform.', category: 'Service Management' },
+  // Service Configuration (CRUD for service definitions)
+  { id: 'service:config:create', name: 'Create Service Definitions', description: 'Allows adding new services or service types to the platform.', category: 'Service Configuration' },
+  { id: 'service:config:read', name: 'Read Service Definitions', description: 'Allows viewing global settings of available services.', category: 'Service Configuration' },
+  { id: 'service:config:update', name: 'Update Service Definitions', description: 'Allows modifying global settings of available services.', category: 'Service Configuration' },
+  { id: 'service:config:delete', name: 'Delete Service Definitions', description: 'Allows removing services or service types from the platform.', category: 'Service Configuration' },
+  { id: 'service:config:assign_subscription', name: 'Assign Subscriptions to Services', description: 'Allows linking subscription plans to services.', category: 'Service Configuration'},
   
-  // Subscription Management
+  // Subscription Management (CRUD for subscription plans)
   { id: 'subscription:create', name: 'Create Subscription Plans', description: 'Allows creating new subscription plans.', category: 'Subscription Management' },
   { id: 'subscription:read', name: 'Read Subscription Plans', description: 'Allows viewing subscription plans.', category: 'Subscription Management' },
   { id: 'subscription:update', name: 'Update Subscription Plans', description: 'Allows editing existing subscription plans.', category: 'Subscription Management' },
   { id: 'subscription:delete', name: 'Delete Subscription Plans', description: 'Allows deleting subscription plans.', category: 'Subscription Management' },
-  { id: 'subscription:assign', name: 'Assign Subscriptions to Users', description: 'Allows assigning subscription plans to users.', category: 'Subscription Management' },
+  // { id: 'subscription:assign', name: 'Assign Subscriptions to Users', description: 'Allows assigning subscription plans to users.', category: 'Subscription Management' }, // This is more a user update permission
 
-  // Individual Service Access Permissions (examples, expand as needed)
+  // Individual Service Access Permissions (user enabling/disabling a service for themselves - this is different from configuring the service itself)
   { id: 'service:content-service:access', name: 'Access Content Service', description: 'Allows user to access the Content Service.', category: 'Service Access' },
   { id: 'service:file-service:access', name: 'Access File Service', description: 'Allows user to access the File Service.', category: 'Service Access' },
   { id: 'service:url-shortener:access', name: 'Access URL Shortener', description: 'Allows user to access the URL Shortener.', category: 'Service Access' },
   { id: 'service:randomizer:access', name: 'Access Randomizer', description: 'Allows user to access the Randomizer tool.', category: 'Service Access' },
-  // Add more specific service access permissions here, e.g., service:some-service:feature-x
 ];
 
 const groupPermissionsByCategory = (permissions: Permission[]) => {
@@ -103,7 +103,7 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!role;
-  const protectedRoleNamesForEdit = ["administrator", "editor", "user"]; // Names that cannot be changed if editing these specific roles
+  const protectedRoleNamesForEditOrDelete = ["administrator", "editor", "user"]; 
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
@@ -131,54 +131,52 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
   const onSubmit = async (values: RoleFormValues) => {
     setIsLoading(true);
 
-    const isNameProtectedForEdit = isEditing && role && protectedRoleNamesForEdit.includes(role.name.toLowerCase());
+    const isNameProtectedSystemRole = protectedRoleNamesForEditOrDelete.includes(values.name.toLowerCase());
+    const isOriginalNameProtectedSystemRole = isEditing && role && protectedRoleNamesForEditOrDelete.includes(role.name.toLowerCase());
 
-    if (isNameProtectedForEdit && role!.name.toLowerCase() !== values.name.toLowerCase()) {
+    if (isOriginalNameProtectedSystemRole && role!.name.toLowerCase() !== values.name.toLowerCase()) {
       toast({
         variant: "destructive",
         title: "Action Not Allowed",
-        description: `The name of the "${role!.name}" role cannot be changed as it is a protected role.`,
+        description: `The name of the default role "${role!.name}" cannot be changed.`,
       });
-      form.setValue("name", role!.name); // Reset name to original
+      form.setValue("name", role!.name); 
       setIsLoading(false);
       return;
     }
-
+    
     // Check for duplicate role name (case-insensitive)
-    // Only check if adding a new role, OR if editing and the name has actually changed
-    if (!isEditing || (isEditing && role && role.name.toLowerCase() !== values.name.toLowerCase())) {
-        const rolesCol = collection(db, "roles");
-        const q = query(rolesCol, where("name_lowercase", "==", values.name.toLowerCase())); // Query lowercase version
-        const querySnapshot = await getDocs(q);
-        
-        let duplicateExists = false;
-        if (!querySnapshot.empty) {
-            // If editing, make sure the found duplicate isn't the role itself
-            if (isEditing && role?.id) {
-                const sameRole = querySnapshot.docs.some(docSnap => docSnap.id === role.id);
-                if (!sameRole) { // A different role with the same name exists
-                    duplicateExists = true;
-                }
-            } else { // If adding a new role, any match is a duplicate
-                duplicateExists = true;
+    const rolesCol = collection(db, "roles");
+    const q = query(rolesCol, where("name_lowercase", "==", values.name.toLowerCase()));
+    const querySnapshot = await getDocs(q);
+    
+    let duplicateExists = false;
+    if (!querySnapshot.empty) {
+        if (isEditing && role?.id) {
+            // If editing, ensure the found duplicate isn't the role itself
+            if (!querySnapshot.docs.some(docSnap => docSnap.id === role.id)) {
+                duplicateExists = true; // A different role with the same name exists
             }
-        }
-
-        if (duplicateExists) {
-            toast({
-                variant: "destructive",
-                title: "Duplicate Role Name",
-                description: `A role with the name "${values.name}" already exists. Please choose a different name.`,
-            });
-            setIsLoading(false);
-            return;
+        } else { // If adding a new role, any match is a duplicate
+            duplicateExists = true;
         }
     }
 
+    if (duplicateExists) {
+        toast({
+            variant: "destructive",
+            title: "Duplicate Role Name",
+            description: `A role with the name "${values.name}" already exists. Please choose a different name.`,
+        });
+        setIsLoading(false);
+        return;
+    }
+
+
     try {
-      const dataToSubmit: Omit<Role, 'id'> & { name_lowercase?: string } = {
+      const dataToSubmit: Omit<Role, 'id'> & { name_lowercase: string } = {
         ...values,
-        name_lowercase: values.name.toLowerCase(), // Store lowercase name for case-insensitive checks
+        name_lowercase: values.name.toLowerCase(),
       };
       await onFormSubmit(dataToSubmit, role?.id);
       setIsOpen(false);
@@ -189,7 +187,7 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
     }
   };
 
-  const nameIsReadOnly = isEditing && role && protectedRoleNamesForEdit.includes(role.name.toLowerCase());
+  const nameIsReadOnly = isEditing && role && protectedRoleNamesForEditOrDelete.includes(role.name.toLowerCase());
   const groupedPermissions = groupPermissionsByCategory(availablePermissions);
 
   return (
