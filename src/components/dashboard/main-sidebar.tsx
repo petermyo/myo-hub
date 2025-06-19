@@ -54,22 +54,20 @@ export function MainSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
-                  tooltip={item.label}
-                  className={cn(
-                    "justify-start",
-                    (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))) && "bg-primary/10 text-primary hover:bg-primary/15"
-                  )}
-                >
-                  <a>
-                    <item.icon className="h-5 w-5" />
-                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </Link>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                tooltip={item.label}
+                className={cn(
+                  "justify-start",
+                  (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))) && "bg-primary/10 text-primary hover:bg-primary/15"
+                )}
+              >
+                <Link href={item.href}>
+                  <item.icon className="h-5 w-5" />
+                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -81,22 +79,20 @@ export function MainSidebar() {
           <SidebarMenu>
             {adminNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                 <Link href={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.label}
-                    className={cn(
-                      "justify-start",
-                      pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
-                    )}
-                  >
-                    <a>
-                      <item.icon className="h-5 w-5" />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </Link>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith(item.href)}
+                  tooltip={item.label}
+                  className={cn(
+                    "justify-start",
+                    pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
+                  )}
+                >
+                  <Link href={item.href}>
+                    <item.icon className="h-5 w-5" />
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -107,22 +103,20 @@ export function MainSidebar() {
          <SidebarMenu>
             {helpNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                 <Link href={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.label}
-                    className={cn(
-                      "justify-start",
-                       pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
-                    )}
-                  >
-                    <a>
-                      <item.icon className="h-5 w-5" />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </Link>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith(item.href)}
+                  tooltip={item.label}
+                  className={cn(
+                    "justify-start",
+                      pathname.startsWith(item.href) && "bg-primary/10 text-primary hover:bg-primary/15"
+                  )}
+                >
+                  <Link href={item.href}>
+                    <item.icon className="h-5 w-5" />
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
