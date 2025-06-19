@@ -229,7 +229,7 @@ export default function AdminUsersPage() {
   if (isLoading && data.length === 0) { 
     return (
       <div className="container mx-auto py-2 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center">
           <Skeleton className="h-10 w-1/3" />
           <Skeleton className="h-10 w-28" />
         </div>
@@ -241,7 +241,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="container mx-auto py-2">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center mb-6">
         <h1 className="text-3xl font-headline font-bold flex items-center">
           <UsersIcon className="w-8 h-8 mr-3 text-primary" /> User Management
         </h1>
