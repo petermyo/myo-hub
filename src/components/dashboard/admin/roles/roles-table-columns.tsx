@@ -19,9 +19,10 @@ import { Badge } from "@/components/ui/badge";
 interface RolesTableColumnsProps {
   onEdit: (role: Role) => void;
   onDelete: (role: Role) => void;
+  protectedRoles: string[]; // lowercase names of protected roles
 }
 
-export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef<Role>[] => [
+export const columns = ({ onEdit, onDelete, protectedRoles }: RolesTableColumnsProps): ColumnDef<Role>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -57,7 +58,16 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
         </Button>
       );
     },
-    cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>,
+    cell: ({ row }) => {
+        const roleName = row.getValue("name") as string;
+        const isProtected = protectedRoles.includes(roleName.toLowerCase());
+        return (
+            <div className="font-medium flex items-center">
+                {roleName}
+                {isProtected && <Badge variant="outline" className="ml-2 text-xs border-yellow-500 text-yellow-700">Protected</Badge>}
+            </div>
+        );
+    }
   },
   {
     accessorKey: "description",
@@ -69,6 +79,9 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
     header: "Permissions Count",
     cell: ({ row }) => {
       const permissions = row.getValue("permissions") as string[];
+      if (permissions && permissions.includes("global:full_access")) {
+        return <Badge variant="default">Full Access</Badge>;
+      }
       return <Badge variant="secondary">{permissions?.length || 0} assigned</Badge>;
     },
   },
@@ -76,9 +89,7 @@ export const columns = ({ onEdit, onDelete }: RolesTableColumnsProps): ColumnDef
     id: "actions",
     cell: ({ row }) => {
       const role = row.original;
-      const protectedRoleNames = ["administrator", "editor", "user"];
-      const isProtectedRole = protectedRoleNames.includes(role.name.toLowerCase());
-
+      const isProtectedRole = protectedRoles.includes(role.name.toLowerCase());
 
       return (
         <DropdownMenu>

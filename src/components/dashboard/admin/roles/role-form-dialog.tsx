@@ -33,41 +33,59 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 
-const availablePermissions: Permission[] = [
-  { id: 'service:content:read', name: 'Access Content Service', description: 'Allows viewing content from the content service.' },
-  { id: 'service:content:write', name: 'Manage Content Service', description: 'Allows creating and editing content.' },
-  { id: 'service:files:read', name: 'Access File Service (Read)', description: 'Allows reading/downloading files.' },
-  { id: 'service:files:write', name: 'Access File Service (Write)', description: 'Allows uploading/modifying files.' },
-  { id: 'service:shortener:manage', name: 'Manage URL Shortener', description: 'Allows creating and managing short links.' },
-  { id: 'service:randomizer:use', name: 'Use Randomizer Tool', description: 'Allows using the randomizer tool.' },
+export const availablePermissions: Permission[] = [
+  // Global
+  { id: 'global:full_access', name: 'Full System Access (Global Administrator)', description: 'Grants all permissions across the entire system. Typically only for the "Administrator" role.', category: 'Global' },
   
-  { id: 'admin:users:read', name: 'View Users', description: 'Allows viewing user list and profiles.' },
-  { id: 'admin:users:create', name: 'Create Users', description: 'Allows creating new user accounts.' },
-  { id: 'admin:users:update', name: 'Update User Profiles', description: 'Allows editing user profiles (name, email, basic info).' },
-  { id: 'admin:users:assignroles', name: 'Assign User Roles', description: 'Allows changing a user\'s role.' },
-  { id: 'admin:users:manage-status', name: 'Manage User Status', description: 'Allows activating or deactivating user accounts.' },
-  { id: 'admin:users:delete', name: 'Delete Users', description: 'Allows deleting user accounts.' },
+  // User Management
+  { id: 'user:create', name: 'Create Users', description: 'Allows creating new user accounts.', category: 'User Management' },
+  { id: 'user:read', name: 'Read Users', description: 'Allows viewing user lists and profiles.', category: 'User Management' },
+  { id: 'user:update', name: 'Update Users', description: 'Allows editing user profiles, roles (excluding assigning Admin), and status.', category: 'User Management' },
+  { id: 'user:delete', name: 'Delete Users', description: 'Allows deleting user accounts.', category: 'User Management' },
   
-  { id: 'admin:roles:read', name: 'View Roles', description: 'Allows viewing roles and their permissions.' },
-  { id: 'admin:roles:create', name: 'Create Roles', description: 'Allows creating new roles.' },
-  { id: 'admin:roles:update', name: 'Update Roles', description: 'Allows editing existing roles and their permissions.' },
-  { id: 'admin:roles:delete', name: 'Delete Roles', description: 'Allows deleting roles.' },
+  // Role Management
+  { id: 'role:create', name: 'Create Roles', description: 'Allows creating new roles and defining their permissions.', category: 'Role Management' },
+  { id: 'role:read', name: 'Read Roles', description: 'Allows viewing existing roles and their permissions.', category: 'Role Management' },
+  { id: 'role:update', name: 'Update Roles', description: 'Allows editing existing roles and their permissions.', category: 'Role Management' },
+  { id: 'role:delete', name: 'Delete Roles', description: 'Allows deleting roles (except protected ones).', category: 'Role Management' },
+
+  // Service Management (for configuring services themselves, not user access to them)
+  { id: 'service:config:create', name: 'Create Service Configurations', description: 'Allows adding new services or service types to the platform.', category: 'Service Management' },
+  { id: 'service:config:read', name: 'Read Service Configurations', description: 'Allows viewing global settings of available services.', category: 'Service Management' },
+  { id: 'service:config:update', name: 'Update Service Configurations', description: 'Allows modifying global settings of available services.', category: 'Service Management' },
+  { id: 'service:config:delete', name: 'Delete Service Configurations', description: 'Allows removing services or service types from the platform.', category: 'Service Management' },
   
-  { id: 'admin:services:manage', name: 'Manage Service Configurations', description: 'Allows managing global service settings.' },
-  
-  { id: 'admin:subscriptions:read', name: 'View Subscriptions', description: 'Allows viewing subscription plans.' },
-  { id: 'admin:subscriptions:manage', name: 'Manage Subscriptions', description: 'Allows managing subscription plans and assigning them to users.' },
+  // Subscription Management
+  { id: 'subscription:create', name: 'Create Subscription Plans', description: 'Allows creating new subscription plans.', category: 'Subscription Management' },
+  { id: 'subscription:read', name: 'Read Subscription Plans', description: 'Allows viewing subscription plans.', category: 'Subscription Management' },
+  { id: 'subscription:update', name: 'Update Subscription Plans', description: 'Allows editing existing subscription plans.', category: 'Subscription Management' },
+  { id: 'subscription:delete', name: 'Delete Subscription Plans', description: 'Allows deleting subscription plans.', category: 'Subscription Management' },
+  { id: 'subscription:assign', name: 'Assign Subscriptions to Users', description: 'Allows assigning subscription plans to users.', category: 'Subscription Management' },
+
+  // Individual Service Access Permissions (examples, expand as needed)
+  { id: 'service:content-service:access', name: 'Access Content Service', description: 'Allows user to access the Content Service.', category: 'Service Access' },
+  { id: 'service:file-service:access', name: 'Access File Service', description: 'Allows user to access the File Service.', category: 'Service Access' },
+  { id: 'service:url-shortener:access', name: 'Access URL Shortener', description: 'Allows user to access the URL Shortener.', category: 'Service Access' },
+  { id: 'service:randomizer:access', name: 'Access Randomizer', description: 'Allows user to access the Randomizer tool.', category: 'Service Access' },
+  // Add more specific service access permissions here, e.g., service:some-service:feature-x
 ];
+
+const groupPermissionsByCategory = (permissions: Permission[]) => {
+  return permissions.reduce((acc, permission) => {
+    const category = permission.category || 'Other';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(permission);
+    return acc;
+  }, {} as Record<string, Permission[]>);
+};
 
 
 const roleFormSchema = z.object({
   name: z.string()
     .min(2, { message: "Role name must be at least 2 characters." })
-    .max(50, { message: "Role name must not exceed 50 characters." })
-    .refine(val => val.toLowerCase() !== "administrator" && val.toLowerCase() !== "editor" && val.toLowerCase() !== "user", {
-      message: "Cannot use the names 'Administrator', 'Editor', or 'User' for new roles as they are protected.",
-      // This part of refine is only for new roles. Editing these roles' names is blocked elsewhere.
-    }),
+    .max(50, { message: "Role name must not exceed 50 characters." }),
   description: z.string().min(5, { message: "Description must be at least 5 characters." }).max(200, { message: "Description must not exceed 200 characters." }),
   permissions: z.array(z.string()).min(0, { message: "Select at least one permission or none if applicable." }),
 });
@@ -85,8 +103,7 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!role;
-  const protectedRoleNames = ["administrator", "editor", "user"];
-
+  const protectedRoleNamesForEdit = ["administrator", "editor", "user"]; // Names that cannot be changed if editing these specific roles
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
@@ -113,48 +130,57 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
 
   const onSubmit = async (values: RoleFormValues) => {
     setIsLoading(true);
-    // Prevent editing the name of protected roles
-    if (isEditing && role && protectedRoleNames.includes(role.name.toLowerCase()) && role.name !== values.name) {
+
+    const isNameProtectedForEdit = isEditing && role && protectedRoleNamesForEdit.includes(role.name.toLowerCase());
+
+    if (isNameProtectedForEdit && role!.name.toLowerCase() !== values.name.toLowerCase()) {
       toast({
         variant: "destructive",
         title: "Action Not Allowed",
-        description: `The name of the "${role.name}" role cannot be changed.`,
+        description: `The name of the "${role!.name}" role cannot be changed as it is a protected role.`,
       });
-      form.setValue("name", role.name); // Reset name to original
+      form.setValue("name", role!.name); // Reset name to original
       setIsLoading(false);
       return;
     }
 
-    // Check for duplicate role name if adding a new role or if name changed during edit
+    // Check for duplicate role name (case-insensitive)
+    // Only check if adding a new role, OR if editing and the name has actually changed
     if (!isEditing || (isEditing && role && role.name.toLowerCase() !== values.name.toLowerCase())) {
         const rolesCol = collection(db, "roles");
-        const q = query(rolesCol, where("name", "==", values.name));
+        const q = query(rolesCol, where("name_lowercase", "==", values.name.toLowerCase())); // Query lowercase version
         const querySnapshot = await getDocs(q);
+        
+        let duplicateExists = false;
         if (!querySnapshot.empty) {
-            // Check if the duplicate found is the same role being edited (if its ID matches)
-            let isSameRoleBeingEdited = false;
+            // If editing, make sure the found duplicate isn't the role itself
             if (isEditing && role?.id) {
-                querySnapshot.forEach(docSnap => {
-                    if (docSnap.id === role.id) {
-                        isSameRoleBeingEdited = true;
-                    }
-                });
+                const sameRole = querySnapshot.docs.some(docSnap => docSnap.id === role.id);
+                if (!sameRole) { // A different role with the same name exists
+                    duplicateExists = true;
+                }
+            } else { // If adding a new role, any match is a duplicate
+                duplicateExists = true;
             }
-            if (!isSameRoleBeingEdited) {
-                toast({
-                    variant: "destructive",
-                    title: "Duplicate Role",
-                    description: `A role with the name "${values.name}" already exists.`,
-                });
-                setIsLoading(false);
-                return;
-            }
+        }
+
+        if (duplicateExists) {
+            toast({
+                variant: "destructive",
+                title: "Duplicate Role Name",
+                description: `A role with the name "${values.name}" already exists. Please choose a different name.`,
+            });
+            setIsLoading(false);
+            return;
         }
     }
 
-
     try {
-      await onFormSubmit(values, role?.id);
+      const dataToSubmit: Omit<Role, 'id'> & { name_lowercase?: string } = {
+        ...values,
+        name_lowercase: values.name.toLowerCase(), // Store lowercase name for case-insensitive checks
+      };
+      await onFormSubmit(dataToSubmit, role?.id);
       setIsOpen(false);
     } catch (error: any) {
       // Error toast is handled by parent, or specific ones here if needed
@@ -163,16 +189,17 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
     }
   };
 
-  const nameIsReadOnly = isEditing && role && protectedRoleNames.includes(role.name.toLowerCase());
+  const nameIsReadOnly = isEditing && role && protectedRoleNamesForEdit.includes(role.name.toLowerCase());
+  const groupedPermissions = groupPermissionsByCategory(availablePermissions);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Role" : "Add New Role"}</DialogTitle>
           <DialogDescription>
             {isEditing ? "Modify the details of the existing role." : "Fill in the form to create a new role."}
-            {nameIsReadOnly && <span className="block text-sm text-yellow-600 mt-1">The name of default roles cannot be changed.</span>}
+            {nameIsReadOnly && <span className="block text-sm text-yellow-600 mt-1">The name of default roles (Administrator, Editor, User) cannot be changed.</span>}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -218,40 +245,45 @@ export function RoleFormDialog({ role, onFormSubmit, isOpen, setIsOpen }: RoleFo
                       Select the permissions this role will grant.
                     </p>
                   </div>
-                  <ScrollArea className="h-60 rounded-md border p-4">
-                    {availablePermissions.map((permission) => (
-                      <FormField
-                        key={permission.id}
-                        control={form.control}
-                        name="permissions"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={permission.id}
-                              className="flex flex-row items-start space-x-3 space-y-0 mb-3"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(permission.id)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), permission.id])
-                                      : field.onChange(
-                                          (field.value || []).filter(
-                                            (value) => value !== permission.id
-                                          )
-                                        );
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal text-sm">
-                                <span className="font-medium">{permission.name}</span>
-                                {permission.description && <p className="text-xs text-muted-foreground">{permission.description}</p>}
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
-                      />
+                  <ScrollArea className="h-72 rounded-md border p-4">
+                    {Object.entries(groupedPermissions).map(([category, perms]) => (
+                      <div key={category} className="mb-4">
+                        <h4 className="font-semibold text-md mb-2 pb-1 border-b">{category}</h4>
+                        {perms.map((permission) => (
+                          <FormField
+                            key={permission.id}
+                            control={form.control}
+                            name="permissions"
+                            render={({ field }) => {
+                              return (
+                                <FormItem
+                                  key={permission.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0 mb-3"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(permission.id)}
+                                      onCheckedChange={(checked) => {
+                                        return checked
+                                          ? field.onChange([...(field.value || []), permission.id])
+                                          : field.onChange(
+                                              (field.value || []).filter(
+                                                (value) => value !== permission.id
+                                              )
+                                            );
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-normal text-sm">
+                                    <span className="font-medium">{permission.name}</span>
+                                    {permission.description && <p className="text-xs text-muted-foreground">{permission.description}</p>}
+                                  </FormLabel>
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        ))}
+                      </div>
                     ))}
                   </ScrollArea>
                   <FormMessage />

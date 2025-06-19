@@ -26,16 +26,17 @@ export interface Service {
 }
 
 export interface Permission {
-  id: string; // e.g., "service:content:read", "admin:users:delete"
-  name: string; // e.g., "Read Content Service", "Delete Users"
+  id: string; // e.g., "user:create", "service:content-service:access"
+  name: string; // e.g., "Create Users", "Access Content Service"
   description?: string;
+  category: 'User Management' | 'Role Management' | 'Service Management' | 'Subscription Management' | 'Service Access' | 'Global';
 }
 
 export interface Role {
   id?: string; // Firestore document ID (optional before creation)
   name: string; // Display name, e.g., "Administrator", "Editor", "User"
   description: string;
-  permissions: string[]; // Array of Permission IDs, e.g., ['service:content:read', 'admin:users:manage']
+  permissions: string[]; // Array of Permission IDs
 }
 
 export interface SubscriptionPlan {
@@ -48,3 +49,4 @@ export interface SubscriptionPlan {
   permissionsGranted?: string[]; // Array of Permission IDs this plan grants
   highlight?: boolean; // To mark a plan as "popular" or "recommended"
 }
+

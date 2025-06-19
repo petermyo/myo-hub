@@ -67,15 +67,15 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
       },
       cell: ({ row }) => {
         const user = row.original;
-        const avatarUrl = user.avatarUrl || `https://placehold.co/100x100.png?text=${user.name.charAt(0).toUpperCase()}`;
+        const avatarUrl = user.avatarUrl || `https://placehold.co/100x100.png?text=${user.name ? user.name.charAt(0).toUpperCase() : 'U'}`;
         return (
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9">
               <AvatarImage src={avatarUrl} alt={user.name} data-ai-hint="profile person" />
-              <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{user.name ? user.name.charAt(0).toUpperCase() : "U"}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
-              <span className="font-medium">{user.name}</span>
+              <span className="font-medium">{user.name || "N/A"}</span>
               <span className="text-xs text-muted-foreground">{user.email}</span>
             </div>
           </div>
@@ -85,7 +85,13 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
     {
       accessorKey: "role",
       header: "Role",
-      cell: ({ row }) => <Badge variant="outline">{row.getValue("role")}</Badge>,
+      cell: ({ row }) => {
+        const role = row.getValue("role") as string;
+        if (!role || role.trim() === "") {
+          return <Badge variant="destructive">Role Not Assigned</Badge>;
+        }
+        return <Badge variant="outline">{role}</Badge>;
+      }
     },
     {
       accessorKey: "status",
@@ -108,7 +114,7 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
         }
         return (
           <Badge variant={"outline"} className={badgeClass}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown"}
           </Badge>
         );
       },
@@ -148,11 +154,10 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
         let canDelete = false;
 
         if (performingUserRole === "Administrator") {
-          canEdit = true;
-          canDelete = !isSelf; // Admin cannot delete self
+          canEdit = true; // Admin can edit anyone (including self, though usually via profile page)
+          canDelete = !isSelf; // Admin cannot delete self via this table
         } else if (performingUserRole === "Editor") {
           // Editors can edit users unless the target user is an Administrator or another Editor.
-          // Editors cannot edit themselves through this table (profile page is for that).
           canEdit = !isSelf && user.role !== "Administrator" && user.role !== "Editor";
           // Editors cannot delete any users.
           canDelete = false;
