@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +23,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -30,78 +30,103 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { User, Role } from "@/types";
+import type { User } from "@/types"; // Role type might be needed if complex
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-// Dummy roles data - replace with actual data fetching
-const availableRoles: Role[] = [
-  { id: "admin", name: "Administrator", description: "Full access", permissions: [] },
-  { id: "editor", name: "Editor", description: "Can edit content", permissions: [] },
-  { id: "user", name: "User", description: "Basic access", permissions: [] },
+// Dummy roles data - in a real app, this might come from Firestore or config
+const availableRoles = [
+  { id: "Administrator", name: "Administrator" },
+  { id: "Editor", name: "Editor" },
+  { id: "User", name: "User" },
 ];
 
-const userFormSchema = z.object({
+const userFormSchemaBase = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   role: z.string().min(1, { message: "Please select a role." }),
-  // Add password fields if creating a new user or allowing password change
-  // password: z.string().min(6, { message: "Password must be at least 6 characters." }).optional(),
 });
+
+// Schema for adding a new user (password is required)
+const newUserFormSchema = userFormSchemaBase.extend({
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+// Schema for editing an existing user (password is optional or not present)
+const editUserFormSchema = userFormSchemaBase;
+
 
 interface UserFormDialogProps {
   user?: User | null; // User object for editing, null/undefined for adding
-  triggerButton?: React.ReactNode;
-  onFormSubmit: (values: User) => Promise<void>; // Callback after successful submission
+  triggerButton?: ReactNode;
+  onFormSubmit: (values: User, originalUserUid?: string) => Promise<void>;
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
 }
 
-export function UserFormDialog({ user, triggerButton, onFormSubmit }: UserFormDialogProps) {
+export function UserFormDialog({ user, triggerButton, onFormSubmit, isOpen, setIsOpen }: UserFormDialogProps) {
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const isEditing = !!user;
 
-  const form = useForm<z.infer<typeof userFormSchema>>({
-    resolver: zodResolver(userFormSchema),
+  const form = useForm<z.infer<typeof userFormSchemaBase & { password?: string; confirmPassword?: string }>>({
+    resolver: zodResolver(isEditing ? editUserFormSchema : newUserFormSchema),
     defaultValues: {
-      name: user?.name || "",
-      email: user?.email || "",
-      role: user?.role || "",
+      name: "",
+      email: "",
+      role: "",
+      password: "",
+      confirmPassword: "",
     },
   });
 
   useEffect(() => {
-    if (user) {
-      form.reset({
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      });
-    } else {
-      form.reset({ name: "", email: "", role: "" });
+    if (isOpen) { // Reset form when dialog opens
+        if (user) {
+        form.reset({
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            password: "", // Don't prefill password for editing
+            confirmPassword: "",
+        });
+        } else {
+        form.reset({ name: "", email: "", role: "", password: "", confirmPassword: ""});
+        }
     }
   }, [user, form, isOpen]);
 
-  async function onSubmit(values: z.infer<typeof userFormSchema>) {
+
+  async function onSubmit(values: z.infer<typeof userFormSchemaBase & { password?: string; confirmPassword?: string }>) {
     setIsLoading(true);
     try {
       const submittedUser: User = {
-        id: user?.id || crypto.randomUUID(), // Generate ID if new
-        status: user?.status || 'pending', // Default status for new users
+        uid: user?.uid || "", // Will be set by Firebase Auth on creation if new
+        name: values.name,
+        email: values.email,
+        role: values.role,
+        status: user?.status || 'active', // Default for new, preserve for existing
         createdAt: user?.createdAt || new Date().toISOString(),
-        ...values,
+        // Only include password if it's a new user form
+        ...( !isEditing && values.password && { password: values.password }),
       };
-      await onFormSubmit(submittedUser);
+      await onFormSubmit(submittedUser, user?.uid); // Pass original UID for edits
       toast({
         title: user ? "User Updated" : "User Created",
         description: `${values.name} has been successfully ${user ? 'updated' : 'added'}.`,
       });
       setIsOpen(false);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("User form submission error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to ${user ? 'update' : 'create'} user. Please try again.`,
+        description: error.message || `Failed to ${user ? 'update' : 'create'} user. Please try again.`,
       });
     } finally {
       setIsLoading(false);
@@ -110,12 +135,12 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit }: UserFormDi
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
+      {triggerButton && <DialogTrigger asChild onClick={() => setIsOpen(true)}>{triggerButton}</DialogTrigger>}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{user ? "Edit User" : "Add New User"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit User" : "Add New User"}</DialogTitle>
           <DialogDescription>
-            {user ? "Modify the details of the existing user." : "Fill in the form to create a new user account."}
+            {isEditing ? "Modify the details of the existing user." : "Fill in the form to create a new user account."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -140,8 +165,9 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit }: UserFormDi
                 <FormItem>
                   <FormLabel>Email Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="user@example.com" {...field} type="email" />
+                    <Input placeholder="user@example.com" {...field} type="email" readOnly={isEditing} />
                   </FormControl>
+                  {isEditing && <p className="text-xs text-muted-foreground">Email cannot be changed after creation through this form.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -159,9 +185,9 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit }: UserFormDi
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableRoles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.name}
+                      {availableRoles.map((roleOpt) => (
+                        <SelectItem key={roleOpt.id} value={roleOpt.id}>
+                          {roleOpt.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -170,14 +196,43 @@ export function UserFormDialog({ user, triggerButton, onFormSubmit }: UserFormDi
                 </FormItem>
               )}
             />
-            {/* Add password fields here if needed for create/edit */}
+            {!isEditing && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input placeholder="••••••••" {...field} type="password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input placeholder="••••••••" {...field} type="password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isLoading}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {user ? "Save Changes" : "Create User"}
+                {isEditing ? "Save Changes" : "Create User"}
               </Button>
             </DialogFooter>
           </form>

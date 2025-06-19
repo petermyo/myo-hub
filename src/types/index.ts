@@ -1,20 +1,23 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface User {
-  id: string;
+  uid: string; // Changed from id to uid to match Firebase
   name: string;
   email: string;
-  role: string; // Role ID or name
+  role: string; // Role ID or name, e.g., "Administrator", "Editor", "User"
   status: 'active' | 'inactive' | 'pending';
   lastLogin?: Date | string;
   createdAt: Date | string;
   avatarUrl?: string;
   enabledServices?: string[]; // Array of Service IDs
   subscriptionPlanId?: string;
+  password?: string; // Optional: only for form validation, not stored directly
+  confirmPassword?: string; // Optional: only for form validation
 }
 
 export interface Service {
-  id: string;
+  id: string; // Keep as id for service identification, not user id
   name: string;
   description: string;
   url: string;
@@ -23,8 +26,8 @@ export interface Service {
 }
 
 export interface Role {
-  id: string;
-  name: string;
+  id: string; // Role identifier, e.g., "admin", "editor", "user"
+  name: string; // Display name, e.g., "Administrator"
   description: string;
   permissions: string[]; // e.g., ['service:content:read', 'admin:user:manage']
 }

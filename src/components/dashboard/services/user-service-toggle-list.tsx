@@ -1,15 +1,17 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, User } from '@/types';
 import { BookOpen, LinkIcon as ShortenerIcon, Shuffle, FileText, Settings, Loader2 } from 'lucide-react';
-import Image from 'next/image';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
-// Dummy services data - replace with actual data fetching
+// Dummy services data - replace with actual data fetching or configuration
 const allServices: Service[] = [
   { id: "content-service", name: "Content Platform", description: "Access exclusive articles and content.", url: "content.myozarniaung.com", icon: BookOpen, category: 'Content' },
   { id: "shortener-service", name: "URL Shortener", description: "Create and manage short links.", url: "shortner.myozarniaung.com", icon: ShortenerIcon, category: 'Utility' },
@@ -18,28 +20,53 @@ const allServices: Service[] = [
 ];
 
 interface UserServiceToggleListProps {
-  user: User; // Assuming user object contains enabledServices
+  user: User;
 }
 
-export function UserServiceToggleList({ user: initialUser }: UserServiceToggleListProps) {
-  const [enabledServices, setEnabledServices] = useState<string[]>(initialUser.enabledServices || []);
+export function UserServiceToggleList({ user }: UserServiceToggleListProps) {
+  const [enabledServices, setEnabledServices] = useState<string[]>(user.enabledServices || []);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
+  useEffect(() => {
+    setEnabledServices(user.enabledServices || []);
+  }, [user.enabledServices]);
+
   const handleServiceToggle = async (serviceId: string, isEnabled: boolean) => {
+    if (!user || !user.uid) {
+        toast({ variant: "destructive", title: "Error", description: "User not authenticated." });
+        return;
+    }
     setLoadingStates(prev => ({ ...prev, [serviceId]: true }));
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 750));
+    
+    try {
+        const userDocRef = doc(db, "users", user.uid);
+        if (isEnabled) {
+            await updateDoc(userDocRef, {
+                enabledServices: arrayUnion(serviceId)
+            });
+            setEnabledServices(prev => [...prev, serviceId]);
+        } else {
+            await updateDoc(userDocRef, {
+                enabledServices: arrayRemove(serviceId)
+            });
+            setEnabledServices(prev => prev.filter(id => id !== serviceId));
+        }
 
-    setEnabledServices(prev =>
-      isEnabled ? [...prev, serviceId] : prev.filter(id => id !== serviceId)
-    );
-
-    toast({
-      title: `Service ${isEnabled ? 'Enabled' : 'Disabled'}`,
-      description: `${allServices.find(s => s.id === serviceId)?.name} has been ${isEnabled ? 'enabled' : 'disabled'}.`,
-    });
-    setLoadingStates(prev => ({ ...prev, [serviceId]: false }));
+        toast({
+        title: `Service ${isEnabled ? 'Enabled' : 'Disabled'}`,
+        description: `${allServices.find(s => s.id === serviceId)?.name} has been ${isEnabled ? 'enabled' : 'disabled'}.`,
+        });
+    } catch (error) {
+        console.error("Error updating services:", error);
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: "Could not update service status. Please try again."
+        });
+    } finally {
+        setLoadingStates(prev => ({ ...prev, [serviceId]: false }));
+    }
   };
 
   return (
@@ -53,7 +80,7 @@ export function UserServiceToggleList({ user: initialUser }: UserServiceToggleLi
       <CardContent className="space-y-6">
         {allServices.map((service) => {
           const Icon = service.icon || Settings;
-          const isEnabled = enabledServices.includes(service.id);
+          const isServiceEnabled = enabledServices.includes(service.id);
           const isLoading = loadingStates[service.id];
           return (
             <div key={service.id} className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 rounded-lg transition-colors duration-200">
@@ -75,7 +102,7 @@ export function UserServiceToggleList({ user: initialUser }: UserServiceToggleLi
                 {isLoading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
                 <Switch
                   id={`service-${service.id}`}
-                  checked={isEnabled}
+                  checked={isServiceEnabled}
                   onCheckedChange={(checked) => handleServiceToggle(service.id, checked)}
                   disabled={isLoading}
                   aria-label={`Toggle ${service.name}`}

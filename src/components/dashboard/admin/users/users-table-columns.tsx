@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -17,10 +18,13 @@ import {
 import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react";
 import { format } from 'date-fns';
 
-// This type is used to define the shape of our data.
-// You can use a Zod schema here if you want.
+interface UsersTableColumnsProps {
+  onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
+  onViewDetails: (user: User) => void;
+}
 
-export const columns: ColumnDef<User>[] = [
+export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsProps): ColumnDef<User>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -58,10 +62,11 @@ export const columns: ColumnDef<User>[] = [
     },
     cell: ({ row }) => {
       const user = row.original;
+      const avatarUrl = user.avatarUrl || `https://placehold.co/100x100.png?text=${user.name.charAt(0).toUpperCase()}`;
       return (
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="profile person" />
+            <AvatarImage src={avatarUrl} alt={user.name} data-ai-hint="profile person" />
             <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
@@ -97,7 +102,11 @@ export const columns: ColumnDef<User>[] = [
     header: "Created At",
     cell: ({ row }) => {
       const date = row.getValue("createdAt");
-      return <span>{date ? format(new Date(date as string), "PP") : 'N/A'}</span>;
+      try {
+        return <span>{date ? format(new Date(date as string), "PP") : 'N/A'}</span>;
+      } catch (e) {
+        return <span>Invalid Date</span>;
+      }
     },
   },
   {
@@ -105,19 +114,17 @@ export const columns: ColumnDef<User>[] = [
     header: "Last Login",
     cell: ({ row }) => {
       const date = row.getValue("lastLogin");
-      return <span>{date ? format(new Date(date as string), "PPp") : 'N/A'}</span>;
+      try {
+        return <span>{date ? format(new Date(date as string), "PPp") : 'N/A'}</span>;
+      } catch (e) {
+         return <span>N/A</span>; // Or Invalid Date if preferred
+      }
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
       const user = row.original;
-      // In a real app, these would trigger modals or navigation
-      const handleEdit = () => console.log("Edit user:", user.id);
-      const handleDelete = () => console.log("Delete user:", user.id);
-      const handleViewDetails = () => console.log("View details for user:", user.id);
-
-
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -128,16 +135,16 @@ export const columns: ColumnDef<User>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={handleViewDetails}>
+            <DropdownMenuItem onClick={() => onViewDetails(user)}>
               <Eye className="mr-2 h-4 w-4" />
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleEdit}>
+            <DropdownMenuItem onClick={() => onEdit(user)}>
               <Edit className="mr-2 h-4 w-4" />
               Edit User
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
+            <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete User
             </DropdownMenuItem>

@@ -20,6 +20,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -48,16 +51,47 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log("Register values:", values);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const firebaseUser = userCredential.user;
 
-    toast({
-      title: "Registration Successful",
-      description: "Your account has been created. Please log in.",
-    });
-    router.push("/auth/login");
-    setIsLoading(false);
+      // Update Firebase Auth profile
+      await updateProfile(firebaseUser, { displayName: values.name });
+
+      // Create user document in Firestore
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      await setDoc(userDocRef, {
+        uid: firebaseUser.uid,
+        name: values.name,
+        email: values.email,
+        role: "User", // Default role
+        status: "active",
+        createdAt: new Date().toISOString(),
+        enabledServices: [], // Default empty enabled services
+      });
+
+      toast({
+        title: "Registration Successful",
+        description: "Your account has been created. Please log in.",
+      });
+      router.push("/auth/login");
+
+    } catch (error: any) {
+      console.error("Firebase registration error:", error);
+      let errorMessage = "An error occurred during registration. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email address is already in use.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "The password is too weak. Please choose a stronger password.";
+      }
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -147,5 +181,4 @@ export function RegisterForm() {
   );
 }
 
-// Minimal Separator component if not available or for local use
 const Separator = () => <hr className="border-border" />;

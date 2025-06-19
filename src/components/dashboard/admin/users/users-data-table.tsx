@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -30,18 +31,17 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, PlusCircle } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  onAddUser?: () => void; // Optional: Callback for Add User button
+  // onAddUser?: () => void; // Removed as Add User button is now outside this table directly in page
 }
 
 export function UsersDataTable<TData, TValue>({
   columns,
   data,
-  onAddUser,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -65,6 +65,9 @@ export function UsersDataTable<TData, TValue>({
       columnVisibility,
       rowSelection,
     },
+    meta: {
+      // Any functions passed via meta can be used in columns
+    }
   });
 
   return (
@@ -73,9 +76,11 @@ export function UsersDataTable<TData, TValue>({
         <Input
           placeholder="Filter users by name or email..."
           value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value)
-          }
+          onChange={(event) => {
+            table.getColumn("name")?.setFilterValue(event.target.value) // Filter by name
+            // To filter by email as well, you might need a global filter or a custom filter function
+            // Or, filter specific column: table.getColumn("email")?.setFilterValue(event.target.value);
+          }}
           className="max-w-sm"
         />
         <div className="flex items-center gap-2">
@@ -99,17 +104,13 @@ export function UsersDataTable<TData, TValue>({
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id}
+                      {column.id === 'actions' ? 'Actions' : column.id}
                     </DropdownMenuCheckboxItem>
                   );
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          {onAddUser && (
-             <Button onClick={onAddUser}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add User
-            </Button>
-          )}
+          {/* Add User button is now managed by the parent page */}
         </div>
       </div>
       <div className="rounded-md border shadow-sm">

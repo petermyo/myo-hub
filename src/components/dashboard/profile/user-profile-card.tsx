@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,49 +10,125 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { UserCircle, Mail, Edit3, Save, Loader2 } from "lucide-react";
 import type { User } from '@/types';
-
-// Dummy user data - replace with actual data fetching
-const dummyUser: User = {
-  id: "user123",
-  name: "Demo User",
-  email: "demo@example.com",
-  role: "User",
-  status: "active",
-  createdAt: new Date().toISOString(),
-  avatarUrl: "https://placehold.co/150x150.png",
-  enabledServices: ["content-service", "shortener-service"],
-};
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 export function UserProfileCard() {
-  const [user, setUser] = useState<User>(dummyUser);
+  const { currentUser: authUser, loading: authLoading, firebaseUser } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For save operation
+  const [isFetchingProfile, setIsFetchingProfile] = useState(true);
   const { toast } = useToast();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (authUser && authUser.uid) {
+      const fetchUserProfile = async () => {
+        setIsFetchingProfile(true);
+        const userDocRef = doc(db, "users", authUser.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setUser({ uid: docSnap.id, ...docSnap.data() } as User);
+        } else {
+          // If Firestore doc doesn't exist, create one from authUser basic info
+           const newUserProfile: User = {
+            uid: authUser.uid,
+            name: firebaseUser?.displayName || authUser.name || "User",
+            email: firebaseUser?.email || authUser.email,
+            role: authUser.role || "User",
+            status: authUser.status || "active",
+            createdAt: authUser.createdAt || new Date().toISOString(),
+            avatarUrl: firebaseUser?.photoURL || authUser.avatarUrl || `https://placehold.co/150x150.png?text=${(firebaseUser?.displayName || authUser.name || "U").charAt(0)}`,
+            enabledServices: authUser.enabledServices || [],
+          };
+          await setDoc(userDocRef, newUserProfile);
+          setUser(newUserProfile);
+          console.warn("User profile not found in Firestore, created one.");
+        }
+        setIsFetchingProfile(false);
+      };
+      fetchUserProfile();
+    } else if (!authLoading) {
+        setIsFetchingProfile(false); // Not authenticated or auth still loading
+    }
+  }, [authUser, authLoading, firebaseUser]);
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
     const { name, value } = e.target;
-    setUser(prev => ({ ...prev, [name]: value } as User));
+    setUser(prev => ({ ...prev!, [name]: value } as User));
   };
 
   const handleSave = async () => {
+    if (!user || !user.uid) return;
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Updated user profile:", user);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved.",
-    });
-    setIsEditing(false);
-    setIsLoading(false);
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      const { uid, role, status, createdAt, password, confirmPassword, ...dataToUpdate } = user; // Exclude fields not directly editable here
+      await updateDoc(userDocRef, dataToUpdate);
+      
+      // Note: Updating email in Firebase Auth requires re-authentication or specific functions,
+      // and updating displayName in Auth is separate. Here we only update Firestore.
+      // If firebaseUser exists and name was changed, consider updating auth profile:
+      // if (firebaseUser && firebaseUser.displayName !== dataToUpdate.name) {
+      //   await updateProfile(firebaseUser, { displayName: dataToUpdate.name });
+      // }
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been saved.",
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: "Could not save your profile. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+  
+  const getInitial = (name?: string) => (name ? name.charAt(0).toUpperCase() : "U");
+
+  if (authLoading || isFetchingProfile) {
+    return (
+      <Card className="w-full max-w-2xl shadow-lg rounded-xl">
+        <CardHeader className="flex flex-row items-center gap-4 p-6 bg-muted/30">
+          <Skeleton className="h-20 w-20 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-5 w-72" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-8 w-1/2" />
+        </CardContent>
+        <CardFooter className="p-6 border-t">
+          <Skeleton className="h-10 w-full" />
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  if (!user) {
+    return <Card className="w-full max-w-2xl p-6"><CardTitle>No user profile found.</CardTitle></Card>;
+  }
+  
+  const avatarSrc = user.avatarUrl || `https://placehold.co/150x150.png?text=${getInitial(user.name)}`;
 
   return (
     <Card className="w-full max-w-2xl shadow-lg rounded-xl">
       <CardHeader className="flex flex-row items-center gap-4 p-6 bg-muted/30">
         <Avatar className="h-20 w-20 border-2 border-primary">
-          <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="profile person" />
-          <AvatarFallback className="text-2xl">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+          <AvatarImage src={avatarSrc} alt={user.name} data-ai-hint="profile person" />
+          <AvatarFallback className="text-2xl">{getInitial(user.name)}</AvatarFallback>
         </Avatar>
         <div>
           <CardTitle className="text-3xl font-headline">{isEditing ? "Edit Profile" : user.name}</CardTitle>
@@ -93,7 +170,7 @@ export function UserProfileCard() {
         </div>
         <div>
           <Label className="text-sm font-medium text-muted-foreground">Member Since</Label>
-          <p className="text-lg font-medium mt-1">{new Date(user.createdAt).toLocaleDateString()}</p>
+          <p className="text-lg font-medium mt-1">{user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</p>
         </div>
       </CardContent>
       <CardFooter className="p-6 border-t">
@@ -103,7 +180,7 @@ export function UserProfileCard() {
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Changes
             </Button>
-            <Button variant="outline" onClick={() => { setIsEditing(false); setUser(dummyUser); }} className="flex-1">
+            <Button variant="outline" onClick={() => { setIsEditing(false); /* Re-fetch or reset if needed */ }} className="flex-1" disabled={isLoading}>
               Cancel
             </Button>
           </div>
