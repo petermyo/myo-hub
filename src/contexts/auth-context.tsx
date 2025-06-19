@@ -9,7 +9,6 @@ import type { ReactNode} from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import type { User } from "@/types"; // Your app's User type
-// Skeleton import is no longer needed here for the provider's direct rendering
 
 interface AuthContextType {
   currentUser: User | null;
@@ -39,7 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAdmin(appUser.role === "Administrator");
         } else {
           console.warn("User document not found in Firestore for UID:", user.uid);
-          const defaultUser: User = { // Ensure User type is fully satisfied
+          // Create a default user profile if none exists, ensuring all User fields are met
+          const defaultUser: User = { 
             uid: user.uid,
             email: user.email || "",
             name: user.displayName || "User",
