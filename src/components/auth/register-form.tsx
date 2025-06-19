@@ -72,8 +72,8 @@ export function RegisterForm() {
       await setDoc(userDocRef, newUserDoc);
 
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created. You can now log in.",
+        title: "Registration Successful!",
+        description: "Your account has been created. Redirecting to login...",
       });
       router.push("/auth/login");
 
@@ -200,3 +200,4 @@ export function RegisterForm() {
 }
 
 const Separator = () => <hr className="border-border" />;
+
