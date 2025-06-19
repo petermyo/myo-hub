@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setLoading(true); 
+      setLoading(true);
       setFirebaseUser(fbUser);
       if (fbUser) {
         const userDocRef = doc(db, "users", fbUser.uid);
@@ -37,11 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userDocSnap.exists()) {
             appUser = { uid: fbUser.uid, ...userDocSnap.data() } as User;
             // Update lastLogin if user document exists
-            await updateDoc(userDocRef, { 
+            await updateDoc(userDocRef, {
               lastLogin: new Date().toISOString()
             });
             // Refresh appUser with updated lastLogin if needed, or assume it's reflected in subsequent reads
-            appUser.lastLogin = new Date().toISOString(); 
+            appUser.lastLogin = new Date().toISOString();
           } else {
             console.warn("User document not found in Firestore for UID:", fbUser.uid, "Creating one.");
             const defaultRole = "User"; // New users default to "User" role
@@ -60,7 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             appUser = newUserProfile;
           }
           setCurrentUser(appUser);
-          setIsAdmin(appUser.role === "Administrator");
+          
+          let determinedIsAdmin = false;
+          if (appUser && appUser.role) { // Check if appUser and appUser.role exist
+              determinedIsAdmin = appUser.role.toLowerCase() === "administrator";
+          }
+          setIsAdmin(determinedIsAdmin);
+
         } catch (error) {
             console.error("Error fetching or updating user document:", error);
             // Fallback to basic user from Firebase Auth if Firestore interaction fails
@@ -103,3 +109,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
