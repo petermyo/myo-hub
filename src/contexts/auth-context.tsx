@@ -3,7 +3,7 @@
 
 import type { User as FirebaseUserType } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"; // Added updateDoc
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import type { ReactNode} from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -25,59 +25,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setLoading(true); // Set loading true at the start of auth state processing
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        const userDocRef = doc(db, "users", fbUser.uid);
         try {
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
-            const appUser = { uid: user.uid, ...userDocSnap.data() } as User;
+            const appUser = { uid: fbUser.uid, ...userDocSnap.data() } as User;
             setCurrentUser(appUser);
             setIsAdmin(appUser.role === "Administrator");
-            // Update lastLogin timestamp
-            await updateDoc(userDocRef, {
+            await updateDoc(userDocRef, { // Ensure this is awaited
               lastLogin: new Date().toISOString()
             });
           } else {
-            console.warn("User document not found in Firestore for UID:", user.uid, "Creating one.");
-            // If Firestore doc doesn't exist, create one from authUser basic info
+            console.warn("User document not found in Firestore for UID:", fbUser.uid, "Creating one.");
             const newUserProfile: User = {
-              uid: user.uid,
-              name: user.displayName || "User",
-              email: user.email || "unknown@example.com", // Ensure email is always set
-              role: "User", // Default role
+              uid: fbUser.uid,
+              name: fbUser.displayName || "User",
+              email: fbUser.email || "unknown@example.com",
+              role: "User",
               status: "active",
               createdAt: new Date().toISOString(),
-              avatarUrl: user.photoURL || `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`,
+              avatarUrl: fbUser.photoURL || `https://placehold.co/100x100.png?text=${(fbUser.displayName || "U").charAt(0)}`,
               enabledServices: [],
-              lastLogin: new Date().toISOString(), // Set lastLogin for new profile
+              lastLogin: new Date().toISOString(),
             };
-            await setDoc(userDocRef, newUserProfile);
+            await setDoc(userDocRef, newUserProfile); // Ensure this is awaited
             setCurrentUser(newUserProfile);
             setIsAdmin(newUserProfile.role === "Administrator");
           }
         } catch (error) {
             console.error("Error fetching or updating user document:", error);
-            // Fallback: set a basic user object if Firestore interaction fails
             const basicUser: User = {
-                uid: user.uid,
-                email: user.email || "",
-                name: user.displayName || "User",
-                role: "User", // Default role, might not be accurate
+                uid: fbUser.uid,
+                email: fbUser.email || "unknown@example.com",
+                name: fbUser.displayName || "User",
+                role: "User",
                 status: "active",
-                createdAt: new Date().toISOString(), // Or from user.metadata.creationTime if available
+                createdAt: new Date().toISOString(),
                 enabledServices: [],
-                avatarUrl: `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`
+                avatarUrl: `https://placehold.co/100x100.png?text=${(fbUser.displayName || "U").charAt(0)}`
             };
             setCurrentUser(basicUser);
-            setIsAdmin(false); // Cannot determine admin status without Firestore role
+            setIsAdmin(false);
+        } finally {
+          setLoading(false); // Set loading to false only after all async operations for a logged-in user are done
         }
       } else {
         setCurrentUser(null);
         setIsAdmin(false);
+        setLoading(false); // Set loading to false if no user
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -97,4 +97,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

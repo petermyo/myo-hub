@@ -10,25 +10,42 @@ import { getFirestore } from "firebase/firestore";
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 
 // ================================================================================================
-// IMPORTANT: REPLACE THE PLACEHOLDER VALUES BELOW WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION!
-// You can find these details in your Firebase project settings.
+// IMPORTANT: FIREBASE CONFIGURATION INSTRUCTIONS
 // ================================================================================================
-// const firebaseConfig = {
-//   apiKey: "YOUR_API_KEY", // Replace with your Firebase project's API Key
-//   authDomain: "YOUR_AUTH_DOMAIN", // Replace with your Firebase project's Auth Domain
-//   projectId: "YOUR_PROJECT_ID", // Replace with your Firebase project's Project ID
-//   storageBucket: "YOUR_STORAGE_BUCKET", // Replace with your Firebase project's Storage Bucket
-//   messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your Firebase project's Messaging Sender ID
-//   appId: "YOUR_APP_ID", // Replace with your Firebase project's App ID
-//   measurementId: "YOUR_MEASUREMENT_ID" // Optional: Replace with your Firebase project's Measurement ID
-// };
+// The `firebaseConfig` object below contains PLACEHOLDER values.
+// You MUST replace these with the actual configuration values for YOUR Firebase project.
+//
+// To get your Firebase project's configuration:
+// 1. Go to the Firebase console (https://console.firebase.google.com/).
+// 2. Select your Firebase project (or create one if you haven't).
+// 3. In the project overview, click on the "Web" icon (</>) to add a web app or select an existing one.
+//    - If you're adding a new web app:
+//      - Register your app (give it a nickname).
+//      - Firebase Hosting setup is optional for now.
+//      - After registration, Firebase will display the `firebaseConfig` object. Copy these values.
+//    - If you have an existing web app:
+//      - Go to "Project settings" (click the gear icon ⚙️ next to "Project Overview").
+//      - Scroll down to the "Your apps" section.
+//      - Find your web app and look for "SDK setup and configuration".
+//      - Select "Config" to view the `firebaseConfig` object. Copy these values.
+//
+// Replace the placeholder values in the `firebaseConfig` object below with the ones you copied.
+// For example:
+//   apiKey: "AIzaSyB...",
+//   authDomain: "your-project-id.firebaseapp.com",
+//   projectId: "your-project-id",
+//   ...etc.
+//
+// ENSURE THIS IS DONE BEFORE DEPLOYING YOUR APPLICATION.
+// ================================================================================================
 const firebaseConfig = {
-  apiKey: "AIzaSyBrnFpY_dJE6Yb4BfVoOCDxeaaAhuPFRLg",
-  authDomain: "ozarnia-hub.firebaseapp.com",
-  projectId: "ozarnia-hub",
-  storageBucket: "ozarnia-hub.firebasestorage.app",
-  messagingSenderId: "220239551651",
-  appId: "1:220239551651:web:bf0f0ea29d1181bb40f316"
+  apiKey: "AIzaSyBrnFpY_dJE6Yb4BfVoOCDxeaaAhuPFRLg", // REPLACE WITH YOUR ACTUAL API KEY
+  authDomain: "ozarnia-hub.firebaseapp.com", // REPLACE WITH YOUR ACTUAL AUTH DOMAIN
+  projectId: "ozarnia-hub", // REPLACE WITH YOUR ACTUAL PROJECT ID
+  storageBucket: "ozarnia-hub.firebasestorage.app", // REPLACE WITH YOUR ACTUAL STORAGE BUCKET
+  messagingSenderId: "220239551651", // REPLACE WITH YOUR ACTUAL MESSAGING SENDER ID
+  appId: "1:220239551651:web:bf0f0ea29d1181bb40f316" // REPLACE WITH YOUR ACTUAL APP ID
+  // measurementId: "G-XXXXXXXXXX" // Optional: REPLACE WITH YOUR ACTUAL MEASUREMENT ID
 };
 
 
@@ -44,4 +61,3 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export { app, auth, db };
-
