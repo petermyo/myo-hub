@@ -13,6 +13,7 @@ import type { User } from '@/types';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { Skeleton } from "@/components/ui/skeleton"; // Added import
 
 export function UserProfileCard() {
   const { currentUser: authUser, loading: authLoading, firebaseUser } = useAuth();
