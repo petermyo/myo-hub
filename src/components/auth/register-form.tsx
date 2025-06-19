@@ -56,37 +56,47 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const firebaseUser = userCredential.user;
 
-      // Update Firebase Auth profile
       await updateProfile(firebaseUser, { displayName: values.name });
 
-      // Create user document in Firestore
       const userDocRef = doc(db, "users", firebaseUser.uid);
       const newUserDoc: Omit<User, 'password' | 'confirmPassword' | 'lastLogin' | 'subscriptionPlanId'> = {
         uid: firebaseUser.uid,
         name: values.name,
         email: values.email,
-        role: "User", // Default role
+        role: "User", 
         status: "active",
         createdAt: new Date().toISOString(),
-        enabledServices: [], // Default empty enabled services
-        avatarUrl: `https://placehold.co/100x100.png?text=${values.name.charAt(0).toUpperCase()}`, // Default avatar
+        enabledServices: [], 
+        avatarUrl: `https://placehold.co/100x100.png?text=${values.name.charAt(0).toUpperCase()}`,
       };
       await setDoc(userDocRef, newUserDoc);
 
       toast({
         title: "Registration Successful",
-        description: "Your account has been created. You can now log in.",
+        description: "Your account has been created. Redirecting to login...",
       });
       router.push("/auth/login");
 
     } catch (error: any) {
-      console.error("Firebase registration error:", error);
+      console.error("Firebase registration error details:", error); // Log the full error object
+      
       let errorMessage = "An error occurred during registration. Please try again.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email address is already in use.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "The password is too weak. Please choose a stronger password.";
+
+      if (error instanceof Error && typeof error.message === 'string' && error.message) {
+        errorMessage = error.message;
       }
+      
+      if (error.code) {
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = "This email address is already in use. Please try a different email or log in.";
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = "The password is too weak. Please choose a stronger password (at least 6 characters).";
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = "The email address is not valid. Please check and try again.";
+        }
+        // Add more specific Firebase error codes here if needed
+      }
+      
       toast({
         variant: "destructive",
         title: "Registration Failed",
@@ -185,3 +195,4 @@ export function RegisterForm() {
 }
 
 const Separator = () => <hr className="border-border" />;
+
