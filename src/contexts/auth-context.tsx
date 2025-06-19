@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           let appUser: User;
           if (userDocSnap.exists()) {
             appUser = { uid: fbUser.uid, ...userDocSnap.data() } as User;
+            console.log("AuthContext: User role from Firestore:", appUser.role); // Log the fetched role
             // Update lastLogin if user document exists
             await updateDoc(userDocRef, {
               lastLogin: new Date().toISOString()
@@ -58,14 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
             await setDoc(userDocRef, newUserProfile);
             appUser = newUserProfile;
+            console.log("AuthContext: Created new user profile with role:", appUser.role); // Log role for new user
           }
           setCurrentUser(appUser);
           
           let determinedIsAdmin = false;
-          if (appUser && appUser.role) { // Check if appUser and appUser.role exist
+          if (appUser && appUser.role) { 
               determinedIsAdmin = appUser.role.toLowerCase() === "administrator";
           }
           setIsAdmin(determinedIsAdmin);
+          console.log("AuthContext: isAdmin determined as:", determinedIsAdmin);
+
 
         } catch (error) {
             console.error("Error fetching or updating user document:", error);
