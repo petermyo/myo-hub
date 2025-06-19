@@ -30,7 +30,6 @@ async function fetchRolesFromFirestore(): Promise<Role[]> {
   return roleList;
 }
 
-// Helper function to check if a role is in use
 async function isRoleInUse(roleName: string): Promise<boolean> {
   const usersCol = collection(db, "users");
   const q = query(usersCol, where("role", "==", roleName));
@@ -54,9 +53,16 @@ export default function AdminRolesPage() {
     try {
       const fetchedRoles = await fetchRolesFromFirestore();
       setRoles(fetchedRoles);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching roles:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch roles." });
+      let description = "Could not fetch roles.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Error Loading Roles", description });
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +105,6 @@ export default function AdminRolesPage() {
   const confirmDeleteRole = async () => {
     if (!roleToDelete || !roleToDelete.id) return;
     
-    // Double check protected roles (already checked in handleDeleteRoleAttempt, but good for safety)
     const protectedRoles = ["administrator", "editor", "user"];
     if (protectedRoles.includes(roleToDelete.name.toLowerCase())) {
         toast({ variant: "destructive", title: "Action Not Allowed", description: `The "${roleToDelete.name}" role cannot be deleted.` });
@@ -108,8 +113,7 @@ export default function AdminRolesPage() {
         return;
     }
     
-    // Double check if role is in use (already checked, but good for safety)
-    setIsLoading(true); // Indicate loading for the delete operation
+    setIsLoading(true);
     const roleInUse = await isRoleInUse(roleToDelete.name);
     if (roleInUse) {
         toast({ variant: "destructive", title: "Role In Use", description: `The "${roleToDelete.name}" role is currently assigned to users and cannot be deleted.` });
@@ -136,20 +140,20 @@ export default function AdminRolesPage() {
   const handleFormSubmit = async (formData: Omit<Role, 'id'>, originalRoleId?: string) => {
     setIsLoading(true);
     try {
-      if (originalRoleId) { // Editing existing role
+      if (originalRoleId) { 
         const roleDocRef = doc(db, "roles", originalRoleId);
         await updateDoc(roleDocRef, formData);
         toast({ title: "Role Updated", description: `Role "${formData.name}" has been successfully updated.` });
-      } else { // Adding new role
+      } else { 
         const rolesCol = collection(db, "roles");
         await addDoc(rolesCol, formData);
         toast({ title: "Role Created", description: `Role "${formData.name}" has been successfully added.` });
       }
-      await loadRoles(); // Refresh data
+      await loadRoles(); 
     } catch (error: any) {
       console.error("Error submitting role form:", error);
       toast({ variant: "destructive", title: "Submission Failed", description: error.message || "Could not save role." });
-      throw error; // Re-throw to allow form dialog to handle its own loading state
+      throw error; 
     } finally {
       setIsLoading(false);
     }

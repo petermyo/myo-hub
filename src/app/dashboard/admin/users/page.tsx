@@ -62,9 +62,16 @@ export default function AdminUsersPage() {
       ]);
       setData(users);
       setAvailableRoles(roles);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching users or roles:", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not fetch users or roles." });
+      let description = "Could not fetch users or roles.";
+      if (error.message) {
+        description += ` Message: ${error.message}`;
+      }
+      if (error.code) {
+        description += ` Code: ${error.code}`;
+      }
+      toast({ variant: "destructive", title: "Error Loading Data", description });
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +87,6 @@ export default function AdminUsersPage() {
   };
   
   const handleEditUser = (user: User) => {
-    // Prevent editors from editing Administrators
     if (performingUser?.role === "Editor" && user.role === "Administrator") {
         toast({ variant: "destructive", title: "Action Not Allowed", description: "Editors cannot edit Administrator accounts." });
         return;
@@ -90,17 +96,14 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteUserAttempt = (user: User) => {
-    // Prevent deleting oneself
     if (user.uid === performingUser?.uid) {
         toast({ variant: "destructive", title: "Action Not Allowed", description: "You cannot delete your own account." });
         return;
     }
-    // Prevent editors from deleting Administrators or other Editors
     if (performingUser?.role === "Editor" && (user.role === "Administrator" || user.role === "Editor")) {
         toast({ variant: "destructive", title: "Action Not Allowed", description: "Editors cannot delete Administrator or other Editor accounts." });
         return;
     }
-    // Only Administrators can delete Administrator accounts (other than themselves)
     if (user.role === "Administrator" && !performingUserIsAdmin) {
          toast({ variant: "destructive", title: "Action Not Allowed", description: "Only Administrators can delete other Administrator accounts." });
         return;
@@ -113,7 +116,6 @@ export default function AdminUsersPage() {
   const confirmDeleteUser = async () => {
     if (!userToDelete || !userToDelete.uid) return;
     
-    // Re-check permissions before actual deletion
     if (userToDelete.uid === performingUser?.uid || 
         (performingUser?.role === "Editor" && (userToDelete.role === "Administrator" || userToDelete.role === "Editor")) ||
         (userToDelete.role === "Administrator" && !performingUserIsAdmin)
@@ -126,8 +128,10 @@ export default function AdminUsersPage() {
 
     setIsLoading(true);
     try {
+      // IMPORTANT: Deleting the Firebase Auth user record typically requires the Admin SDK (e.g., in a Firebase Function).
+      // This client-side operation only deletes the Firestore document.
       await deleteDoc(doc(db, "users", userToDelete.uid));
-      console.warn(`Firestore document for user ${userToDelete.uid} deleted. Corresponding Firebase Auth user record must be deleted separately (e.g., via Admin SDK / Firebase Function).`);
+      console.warn(`Firestore document for user ${userToDelete.uid} deleted. Corresponding Firebase Auth user record must be deleted separately if you want to fully remove the user from Firebase Authentication.`);
       setData(prevData => prevData.filter(u => u.uid !== userToDelete.uid));
       toast({ title: "User Document Deleted", description: `Firestore record for ${userToDelete.name} has been removed.` });
     } catch (error: any) {
@@ -150,15 +154,19 @@ export default function AdminUsersPage() {
         }
         
         const userDocRef = doc(db, "users", originalUserUid);
-        const fieldsToUpdate: Partial<User> = {
-            name: formData.name,
-            // email: formData.email, // Email change handled by Firebase Auth, then synced
-            role: formData.role,
-            status: formData.status // Assuming status is part of the form
+        // Only update fields managed by this form to avoid overwriting other data like lastLogin, createdAt etc.
+        const fieldsToUpdate: Pick<User, 'name' | 'role' | 'status'> = {
+            name: formData.name || (userToEdit?.name || "Unnamed User"),
+            role: formData.role || (userToEdit?.role || "User"),
+            status: formData.status || (userToEdit?.status || "active")
         };
+        // Email is not directly updatable here; Firebase Auth handles email changes which then should be synced if necessary.
         await updateDoc(userDocRef, fieldsToUpdate);
         toast({ title: "User Updated", description: `${formData.name} has been successfully updated.` });
       } else { // Adding new user
+        if (!performingUserIsAdmin) {
+            throw new Error("Only Administrators can create new users.");
+        }
         if (!formData.password || !formData.email) {
             throw new Error("Email and password are required for new users.");
         }
@@ -172,7 +180,7 @@ export default function AdminUsersPage() {
           role: formData.role || "User",
           status: formData.status || "active",
           createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
+          lastLogin: new Date().toISOString(), // Set initial lastLogin
           enabledServices: [],
           avatarUrl: `https://placehold.co/100x100.png?text=${(formData.name || "U").charAt(0).toUpperCase()}`,
         };
@@ -187,7 +195,7 @@ export default function AdminUsersPage() {
           title: "Operation Failed",
           description: error.message || `Could not ${originalUserUid ? 'update' : 'create'} user.`,
         });
-        throw error; // Re-throw to allow form dialog to handle its own loading state
+        throw error; 
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +227,7 @@ export default function AdminUsersPage() {
         <h1 className="text-3xl font-headline font-bold flex items-center">
           <UsersIcon className="w-8 h-8 mr-3 text-primary" /> User Management
         </h1>
-        {performingUserIsAdmin && ( // Only Admins can add users
+        {performingUserIsAdmin && (
           <Button onClick={handleAddUserClick}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add User
           </Button>
@@ -235,7 +243,7 @@ export default function AdminUsersPage() {
             onFormSubmit={handleFormSubmit}
             isOpen={isFormOpen}
             setIsOpen={setIsFormOpen}
-            availableRoles={availableRoles.map(r => ({id: r.name, name: r.name}))} // Pass roles as {id, name}
+            availableRoles={availableRoles.map(r => ({id: r.name, name: r.name}))}
             currentUserRole={performingUser?.role}
         />
       )}
@@ -246,7 +254,7 @@ export default function AdminUsersPage() {
             <AlertDialogDescription>
               This action will permanently delete the user&apos;s Firestore document
               for {userToDelete?.name}. Deleting the corresponding Firebase Authentication user record
-              must be done separately, typically using the Firebase Admin SDK.
+              must be done separately (e.g., using the Firebase Admin SDK in a backend environment).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
