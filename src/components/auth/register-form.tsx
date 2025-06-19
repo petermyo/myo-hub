@@ -95,10 +95,12 @@ export function RegisterForm() {
             errorMessage = "The email address is not valid. Please check and try again.";
             break;
           default:
+            // Use Firebase's message if available, otherwise keep the generic one
             errorMessage = firebaseError.message || `A Firebase error occurred: ${firebaseError.code}`;
             break;
         }
       } else if (error instanceof Error && typeof error.message === 'string' && error.message) {
+        // Handle standard JavaScript errors that have a message property
         errorMessage = error.message;
       }
       
