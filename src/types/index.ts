@@ -22,8 +22,8 @@ export interface Service {
   description: string;
   icon: string; // Name of the LucideIcon
   url: string; // Domain address
+  isActive: boolean; // Service status
   linkedSubscriptionIds?: string[]; // Array of SubscriptionPlan Firestore document IDs
-  // category field removed to simplify, can be added back if needed
 }
 
 export interface Permission {
@@ -50,7 +50,6 @@ export interface SubscriptionPlan {
   points: number; // 0 for unlimited
   storageLimitMB: number; // 0 for unlimited
   price: string; // e.g., "Free", "$10/month"
-  // servicesIncluded: string[]; // Array of Service slugs - Removed for now, linking handled by Service.linkedSubscriptionIds
   features?: string[]; // Optional: list of features
   highlight?: boolean; // To mark a plan as "popular" or "recommended"
 }

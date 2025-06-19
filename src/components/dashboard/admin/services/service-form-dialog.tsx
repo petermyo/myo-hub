@@ -16,6 +16,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription as FormDesc, // Renamed to avoid conflict
   FormField,
   FormItem,
   FormLabel,
@@ -31,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch"; // Added Switch
 import type { Service, SubscriptionPlan } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -38,19 +40,19 @@ import { Loader2, Settings } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as LucideIcons from "lucide-react";
 
-// A curated list of Lucide icons for selection
 const availableLucideIcons: (keyof typeof LucideIcons)[] = [
   "Home", "User", "Settings", "Search", "Mail", "Bell", "Lock", "Link", "Briefcase", "BookOpen", "FileText", "Shuffle", "Database", "Server", "Cloud", "Code", "Terminal", "PenTool", "Globe", "LayoutGrid", "List", "BarChart2", "PieChart", "Sliders", "Shield", "Gift", "ShoppingBag"
 ];
 
 const serviceFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
-  newSlug: z.string().min(2, "Slug must be at least 2 characters.").max(50) // 'newSlug' to handle creation or slug change
+  newSlug: z.string().min(2, "Slug must be at least 2 characters.").max(50)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug can only contain lowercase letters, numbers, and hyphens."),
   description: z.string().optional(),
   icon: z.string().min(1, "Please select an icon."),
   url: z.string().min(3, "URL must be at least 3 characters.").max(100)
     .regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Please enter a valid domain (e.g., example.com)."),
+  isActive: z.boolean().default(true),
   linkedSubscriptionIds: z.array(z.string()).optional(),
 });
 
@@ -77,6 +79,7 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
       description: "",
       icon: "",
       url: "",
+      isActive: true,
       linkedSubscriptionIds: [],
     },
   });
@@ -86,10 +89,11 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
       if (service) {
         form.reset({
           name: service.name,
-          newSlug: service.slug, // Use current slug for editing, can be changed
+          newSlug: service.slug,
           description: service.description || "",
           icon: service.icon,
           url: service.url,
+          isActive: service.isActive === undefined ? true : service.isActive, // Default to true if undefined
           linkedSubscriptionIds: service.linkedSubscriptionIds || [],
         });
       } else {
@@ -99,6 +103,7 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
           description: "",
           icon: "",
           url: "",
+          isActive: true, // Default new services to active
           linkedSubscriptionIds: [],
         });
       }
@@ -114,12 +119,13 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
         description: values.description || "",
         icon: values.icon,
         url: values.url,
+        isActive: values.isActive,
         linkedSubscriptionIds: values.linkedSubscriptionIds || [],
       };
-      await onFormSubmit(dataToSubmit, service?.slug); // Pass original slug if editing
+      await onFormSubmit(dataToSubmit, service?.slug);
       setIsOpen(false);
     } catch (error: any) {
-      // Error toast is handled by parent (e.g., for duplicate slug)
+      // Error toast is handled by parent
     } finally {
       setIsLoading(false);
     }
@@ -128,11 +134,10 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
   const renderLucideIconPreview = (iconName: string) => {
     const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as LucideIcons.LucideIcon | undefined;
     if (!IconComponent) {
-      return <Settings className="w-5 h-5 text-muted-foreground" />; // Fallback icon
+      return <Settings className="w-5 h-5 text-muted-foreground" />;
     }
     return <IconComponent className="w-5 h-5" />;
   };
-
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -231,14 +236,34 @@ export function ServiceFormDialog({ service, onFormSubmit, isOpen, setIsOpen, av
                 />
                 <FormField
                   control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Service Status</FormLabel>
+                        <FormDesc>
+                          Inactive services will not be visible to users.
+                        </FormDesc>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="linkedSubscriptionIds"
                   render={() => (
                     <FormItem>
                       <div className="mb-2">
                         <FormLabel className="text-base">Link Subscription Plans</FormLabel>
-                         <p className="text-sm text-muted-foreground">
+                         <FormDesc>
                             Select which subscription plans can grant access to this service.
-                        </p>
+                        </FormDesc>
                       </div>
                       <ScrollArea className="h-40 rounded-md border p-4">
                         {availableSubscriptionPlans.length > 0 ? availableSubscriptionPlans.map((plan) => (

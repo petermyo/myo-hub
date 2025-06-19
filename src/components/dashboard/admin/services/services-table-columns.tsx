@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Link as LinkIconLucide, Globe } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Globe, CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import * as LucideIcons from "lucide-react";
 
@@ -83,6 +83,24 @@ export const columns = ({ onEdit, onDelete }: ServicesTableColumnsProps): Column
     accessorKey: "slug",
     header: "Slug",
     cell: ({ row }) => <Badge variant="secondary">{row.getValue("slug")}</Badge>,
+  },
+  {
+    accessorKey: "isActive",
+    header: "Status",
+    cell: ({ row }) => {
+      const isActive = row.getValue("isActive") as boolean;
+      return isActive ? (
+        <Badge className="bg-green-100 text-green-700 hover:bg-green-100/80 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700">
+          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+          Active
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="text-destructive-foreground bg-destructive/80 border-destructive/50">
+          <XCircle className="mr-1 h-3.5 w-3.5" />
+          Inactive
+        </Badge>
+      );
+    },
   },
   {
     accessorKey: "url",

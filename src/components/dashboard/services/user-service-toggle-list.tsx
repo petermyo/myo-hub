@@ -7,53 +7,28 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, User } from '@/types';
-import { BookOpen, Link as LinkIcon, Shuffle, FileText, Settings, Loader2, AlertTriangle } from 'lucide-react';
+import { Settings, Loader2, AlertTriangle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove, query, where } from 'firebase/firestore'; // Added query, where
+import * as LucideIcons from "lucide-react";
 
 interface UserServiceToggleListProps {
   user: User;
 }
 
-// Map of icon names (as stored in Firestore) to Lucide icon components
 const iconComponents: Record<string, LucideIcon> = {
-  "BookOpen": BookOpen,
-  "Link": LinkIcon, // Assuming "Link" is the stored name for URL Shortener icon
-  "Shuffle": Shuffle,
-  "FileText": FileText,
-  // Add other icons here as they are made available in ServiceFormDialog
-  "Home": Settings, // Example, replace with actual icons
-  "User": Settings,
-  "Search": Settings,
-  "Mail": Settings,
-  "Bell": Settings,
-  "Lock": Settings,
-  "Briefcase": Settings,
-  "Database": Settings,
-  "Server": Settings,
-  "Cloud": Settings,
-  "Code": Settings,
-  "Terminal": Settings,
-  "PenTool": Settings,
-  "Globe": Settings,
-  "LayoutGrid": Settings,
-  "List": Settings,
-  "BarChart2": Settings,
-  "PieChart": Settings,
-  "Sliders": Settings,
-  "Shield": Settings,
-  "Gift": Settings,
-  "ShoppingBag": Settings,
-  "Settings": Settings, // Default/fallback
+  ...LucideIcons, // Spread all Lucide icons
+  "Link": LucideIcons.Link, // Ensure 'Link' specifically maps if needed for clarity
+  "Settings": LucideIcons.Settings, // Default/fallback
 };
 
-
-async function fetchServicesFromFirestore(): Promise<Service[]> {
+async function fetchActiveServicesFromFirestore(): Promise<Service[]> {
   const servicesCol = collection(db, "services");
-  const serviceSnapshot = await getDocs(servicesCol);
+  // Query for services where isActive is true
+  const q = query(servicesCol, where("isActive", "==", true));
+  const serviceSnapshot = await getDocs(q);
   const serviceList = serviceSnapshot.docs.map(docSnap => {
-    // Firestore doc ID is the slug for services
     return { slug: docSnap.id, ...docSnap.data() } as Service;
   });
   return serviceList;
@@ -72,15 +47,15 @@ export function UserServiceToggleList({ user }: UserServiceToggleListProps) {
       setIsFetchingServices(true);
       setFetchError(null);
       try {
-        const fetchedServices = await fetchServicesFromFirestore();
+        const fetchedServices = await fetchActiveServicesFromFirestore();
         setAvailableServices(fetchedServices);
       } catch (error: any) {
-        console.error("Error fetching services for toggle list:", error);
+        console.error("Error fetching active services for toggle list:", error);
         setFetchError("Could not load available services. Please try again later.");
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to fetch service list."
+          title: "Error Loading Services",
+          description: error.message || "Failed to fetch active service list."
         });
       } finally {
         setIsFetchingServices(false);
@@ -118,12 +93,12 @@ export function UserServiceToggleList({ user }: UserServiceToggleListProps) {
         title: `Service ${isEnabled ? 'Enabled' : 'Disabled'}`,
         description: `${availableServices.find(s => s.slug === serviceSlug)?.name} has been ${isEnabled ? 'enabled' : 'disabled'}.`,
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating services:", error);
         toast({
             variant: "destructive",
             title: "Update Failed",
-            description: "Could not update service status. Please try again."
+            description: error.message || "Could not update service status. Please try again."
         });
     } finally {
         setLoadingStates(prev => ({ ...prev, [serviceSlug]: false }));
@@ -174,7 +149,7 @@ export function UserServiceToggleList({ user }: UserServiceToggleListProps) {
           <CardDescription>Enable or disable access to connected services.</CardDescription>
         </CardHeader>
         <CardContent className="text-center py-10">
-          <p className="text-muted-foreground">No services are currently configured by the administrator.</p>
+          <p className="text-muted-foreground">No active services are currently available.</p>
         </CardContent>
       </Card>
     );
