@@ -44,7 +44,7 @@ export default function DashboardLayout({
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen">
         <MainSidebar />
-        <SidebarInset className="flex-1 flex flex-col bg-background">
+        <SidebarInset className="flex-1 flex flex-col bg-background min-w-0"> {/* Added min-w-0 here */}
           <MainHeader />
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
             {children}
