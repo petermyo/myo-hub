@@ -48,7 +48,7 @@ export function MainHeader() {
   const userAvatar = currentUser?.avatarUrl || `https://placehold.co/100x100.png?text=${userName.charAt(0).toUpperCase()}`;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 lg:px-8">
       <div className="flex-1">
         <h1 className="text-xl font-semibold capitalize">
           {pathname.split("/").pop()?.replace('-', ' ') || "Dashboard"}
