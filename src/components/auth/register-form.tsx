@@ -73,28 +73,33 @@ export function RegisterForm() {
 
       toast({
         title: "Registration Successful",
-        description: "Your account has been created. Redirecting to login...",
+        description: "Your account has been created. You can now log in.",
       });
       router.push("/auth/login");
 
     } catch (error: any) {
-      console.error("Firebase registration error details:", error); // Log the full error object
-      
+      console.error("Firebase registration error details:", error); 
+
       let errorMessage = "An error occurred during registration. Please try again.";
 
-      if (error instanceof Error && typeof error.message === 'string' && error.message) {
-        errorMessage = error.message;
-      }
-      
-      if (error.code) {
-        if (error.code === 'auth/email-already-in-use') {
-          errorMessage = "This email address is already in use. Please try a different email or log in.";
-        } else if (error.code === 'auth/weak-password') {
-          errorMessage = "The password is too weak. Please choose a stronger password (at least 6 characters).";
-        } else if (error.code === 'auth/invalid-email') {
-          errorMessage = "The email address is not valid. Please check and try again.";
+      if (error && typeof error === 'object' && 'code' in error) {
+        const firebaseError = error as { code: string; message?: string };
+        switch (firebaseError.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = "This email address is already in use. Please try a different email or log in.";
+            break;
+          case 'auth/weak-password':
+            errorMessage = "The password is too weak. Please choose a stronger password (at least 6 characters).";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "The email address is not valid. Please check and try again.";
+            break;
+          default:
+            errorMessage = firebaseError.message || `A Firebase error occurred: ${firebaseError.code}`;
+            break;
         }
-        // Add more specific Firebase error codes here if needed
+      } else if (error instanceof Error && typeof error.message === 'string' && error.message) {
+        errorMessage = error.message;
       }
       
       toast({
@@ -195,4 +200,3 @@ export function RegisterForm() {
 }
 
 const Separator = () => <hr className="border-border" />;
-
