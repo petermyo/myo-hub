@@ -3,7 +3,7 @@
 
 import type { User as FirebaseUserType } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"; // Added updateDoc
 import type { ReactNode} from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -29,25 +29,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setFirebaseUser(user);
       if (user) {
         const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const appUser = { uid: user.uid, ...userDocSnap.data() } as User;
-          setCurrentUser(appUser);
-          setIsAdmin(appUser.role === "Administrator");
-        } else {
-          console.warn("User document not found in Firestore for UID:", user.uid);
-          const defaultUser: User = {
-            uid: user.uid,
-            email: user.email || "",
-            name: user.displayName || "User",
-            role: "User",
-            status: "active",
-            createdAt: new Date().toISOString(),
-            enabledServices: [],
-            avatarUrl: `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`
-          };
-          setCurrentUser(defaultUser);
-          setIsAdmin(false);
+        try {
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const appUser = { uid: user.uid, ...userDocSnap.data() } as User;
+            setCurrentUser(appUser);
+            setIsAdmin(appUser.role === "Administrator");
+            // Update lastLogin timestamp
+            await updateDoc(userDocRef, {
+              lastLogin: new Date().toISOString()
+            });
+          } else {
+            console.warn("User document not found in Firestore for UID:", user.uid, "Creating one.");
+            // If Firestore doc doesn't exist, create one from authUser basic info
+            const newUserProfile: User = {
+              uid: user.uid,
+              name: user.displayName || "User",
+              email: user.email || "unknown@example.com", // Ensure email is always set
+              role: "User", // Default role
+              status: "active",
+              createdAt: new Date().toISOString(),
+              avatarUrl: user.photoURL || `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`,
+              enabledServices: [],
+              lastLogin: new Date().toISOString(), // Set lastLogin for new profile
+            };
+            await setDoc(userDocRef, newUserProfile);
+            setCurrentUser(newUserProfile);
+            setIsAdmin(newUserProfile.role === "Administrator");
+          }
+        } catch (error) {
+            console.error("Error fetching or updating user document:", error);
+            // Fallback: set a basic user object if Firestore interaction fails
+            const basicUser: User = {
+                uid: user.uid,
+                email: user.email || "",
+                name: user.displayName || "User",
+                role: "User", // Default role, might not be accurate
+                status: "active",
+                createdAt: new Date().toISOString(), // Or from user.metadata.creationTime if available
+                enabledServices: [],
+                avatarUrl: `https://placehold.co/100x100.png?text=${(user.displayName || "U").charAt(0)}`
+            };
+            setCurrentUser(basicUser);
+            setIsAdmin(false); // Cannot determine admin status without Firestore role
         }
       } else {
         setCurrentUser(null);
@@ -73,3 +97,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

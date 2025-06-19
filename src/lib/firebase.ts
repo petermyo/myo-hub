@@ -8,15 +8,19 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-// IMPORTANT: Replace these with your actual Firebase project configuration values!
+
+// ================================================================================================
+// IMPORTANT: REPLACE THE PLACEHOLDER VALUES BELOW WITH YOUR ACTUAL FIREBASE PROJECT CONFIGURATION!
+// You can find these details in your Firebase project settings.
+// ================================================================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional
+  apiKey: "YOUR_API_KEY", // Replace with your Firebase project's API Key
+  authDomain: "YOUR_AUTH_DOMAIN", // Replace with your Firebase project's Auth Domain
+  projectId: "YOUR_PROJECT_ID", // Replace with your Firebase project's Project ID
+  storageBucket: "YOUR_STORAGE_BUCKET", // Replace with your Firebase project's Storage Bucket
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your Firebase project's Messaging Sender ID
+  appId: "YOUR_APP_ID", // Replace with your Firebase project's App ID
+  measurementId: "YOUR_MEASUREMENT_ID" // Optional: Replace with your Firebase project's Measurement ID
 };
 
 // Initialize Firebase
@@ -31,3 +35,4 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export { app, auth, db };
+
