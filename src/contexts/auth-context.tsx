@@ -5,7 +5,7 @@ import type { User as FirebaseUserType } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import type { ReactNode} from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react"; // Added useMemo
 import { auth, db } from "@/lib/firebase";
 import type { User } from "@/types";
 
@@ -99,8 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  const contextValue = useMemo(() => ({
+    currentUser,
+    firebaseUser,
+    loading,
+    isAdmin,
+  }), [currentUser, firebaseUser, loading, isAdmin]);
+
   return (
-    <AuthContext.Provider value={{ currentUser, firebaseUser, loading, isAdmin }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
