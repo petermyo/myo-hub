@@ -15,15 +15,11 @@ async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
     const serviceSnapshot = await getDocs(q);
     const serviceList = serviceSnapshot.docs.map(docSnap => docSnap.data() as Service);
     
-    // Normalize and check against service URLs
-    // Service URLs in Firestore might be just "service.example.com"
-    // The urlToValidate might be "https://service.example.com/some/path"
     const parsedUrlToValidate = new URL(urlToValidate);
     const domainToValidate = parsedUrlToValidate.hostname;
 
     return serviceList.some(service => {
         try {
-            // If service.url is just a domain, or includes http/https
             const serviceDomain = service.url.includes('://') ? new URL(service.url).hostname : service.url;
             return serviceDomain === domainToValidate;
         } catch (e) {
@@ -39,20 +35,30 @@ async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
 
 const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com'; // Fallback
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { name, email, password, serviceRedirectUrl } = await request.json();
 
     if (!name || !email || !password || !serviceRedirectUrl) {
-      return NextResponse.json({ success: false, error: "Missing required fields (name, email, password, serviceRedirectUrl).", redirectTo: OZARNIA_HUB_URL }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Missing required fields (name, email, password, serviceRedirectUrl).", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
     if (password.length < 6) {
-        return NextResponse.json({ success: false, error: "Password must be at least 6 characters.", redirectTo: OZARNIA_HUB_URL }, { status: 400 });
+        return NextResponse.json({ success: false, error: "Password must be at least 6 characters.", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
     const isValidRedirect = await isValidServiceUrl(serviceRedirectUrl);
     if (!isValidRedirect) {
-      return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
     // Create user in Firebase Auth
@@ -79,8 +85,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: "User registered successfully. Please proceed with login.",
-      redirectTo: serviceRedirectUrl // Send back the validated URL
-    }, { status: 201 });
+      redirectTo: serviceRedirectUrl 
+    }, { status: 201, headers: corsHeaders });
 
   } catch (error: any) {
     console.error("External registration error:", error);
@@ -106,6 +112,6 @@ export async function POST(request: NextRequest) {
           break;
       }
     }
-    return NextResponse.json({ success: false, error: errorMessage, redirectTo: OZARNIA_HUB_URL }, { status: statusCode });
+    return NextResponse.json({ success: false, error: errorMessage, redirectTo: OZARNIA_HUB_URL }, { status: statusCode, headers: corsHeaders });
   }
 }

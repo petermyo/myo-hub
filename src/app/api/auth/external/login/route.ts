@@ -35,17 +35,27 @@ async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
 
 const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com'; // Fallback
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password, serviceRedirectUrl } = await request.json();
 
     if (!email || !password || !serviceRedirectUrl) {
-      return NextResponse.json({ success: false, error: "Missing required fields (email, password, serviceRedirectUrl).", redirectTo: OZARNIA_HUB_URL }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Missing required fields (email, password, serviceRedirectUrl).", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
     const isValidRedirect = await isValidServiceUrl(serviceRedirectUrl);
     if (!isValidRedirect) {
-      return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
     // Sign in user with Firebase Auth
@@ -58,18 +68,11 @@ export async function POST(request: NextRequest) {
       lastLogin: new Date().toISOString()
     });
 
-    // Note: Session management (e.g., setting a cookie or returning a token)
-    // is not implemented here. The calling service would typically handle this
-    // after a successful login response. Ozarnia Hub itself uses Firebase client-side auth state.
-
     return NextResponse.json({ 
       success: true, 
       message: "Login successful.",
-      // In a real scenario, you might return a session token or user info.
-      // For now, the validated redirect URL is sufficient for the third-party service to handle redirection.
-      // userId: firebaseUser.uid, // Optionally return user ID
-      redirectTo: serviceRedirectUrl // Send back the validated URL
-    }, { status: 200 });
+      redirectTo: serviceRedirectUrl 
+    }, { status: 200, headers: corsHeaders });
 
   } catch (error: any) {
     console.error("External login error:", error);
@@ -97,6 +100,6 @@ export async function POST(request: NextRequest) {
           break;
       }
     }
-    return NextResponse.json({ success: false, error: errorMessage, redirectTo: OZARNIA_HUB_URL }, { status: statusCode });
+    return NextResponse.json({ success: false, error: errorMessage, redirectTo: OZARNIA_HUB_URL }, { status: statusCode, headers: corsHeaders });
   }
 }
