@@ -6,7 +6,7 @@ import { doc, updateDoc, getDocs, collection, query, where } from 'firebase/fire
 import { auth, db } from '@/lib/firebase';
 import type { Service } from '@/types';
 
-// Helper to validate service URL (can be shared or defined per route)
+// Helper to validate service URL
 async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
   if (!urlToValidate) return false;
   try {
@@ -33,7 +33,7 @@ async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
   }
 }
 
-const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com'; // Fallback
+const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com'; 
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,11 +58,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
-    // Sign in user with Firebase Auth
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 
-    // Update lastLogin in Firestore
     const userDocRef = doc(db, "users", firebaseUser.uid);
     await updateDoc(userDocRef, {
       lastLogin: new Date().toISOString()
@@ -85,7 +83,7 @@ export async function POST(request: NextRequest) {
         case 'auth/wrong-password':
         case 'auth/invalid-credential':
           errorMessage = "Invalid email or password.";
-          statusCode = 401; // Unauthorized
+          statusCode = 401; 
           break;
         case 'auth/too-many-requests':
             errorMessage = "Too many login attempts. Please try again later.";

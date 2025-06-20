@@ -33,7 +33,7 @@ async function isValidServiceUrl(urlToValidate: string): Promise<boolean> {
   }
 }
 
-const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com'; // Fallback
+const OZARNIA_HUB_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://hub.myozarniaung.com';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,23 +61,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid or inactive service redirect URL.", redirectTo: OZARNIA_HUB_URL }, { status: 400, headers: corsHeaders });
     }
 
-    // Create user in Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 
-    // Update Firebase Auth profile
     await updateProfile(firebaseUser, { displayName: name });
 
-    // Create user document in Firestore
     const userDocRef = doc(db, "users", firebaseUser.uid);
     const newUserDoc: Omit<User, 'password' | 'confirmPassword' | 'lastLogin' | 'subscriptionPlanId'> = {
       uid: firebaseUser.uid,
       name: name,
       email: email,
-      role: "User", // Default role
+      role: "User", 
       status: "active",
       createdAt: new Date().toISOString(),
-      enabledServices: [], // Default: no services enabled initially
+      enabledServices: [], 
       avatarUrl: `https://placehold.co/100x100.png?text=${name.charAt(0).toUpperCase()}`,
     };
     await setDoc(userDocRef, newUserDoc);
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest) {
       switch (error.code) {
         case 'auth/email-already-in-use':
           errorMessage = "This email address is already in use.";
-          statusCode = 409; // Conflict
+          statusCode = 409; 
           break;
         case 'auth/weak-password':
           errorMessage = "The password is too weak. Please choose a stronger password (at least 6 characters).";
