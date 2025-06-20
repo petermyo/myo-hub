@@ -1,60 +1,50 @@
 
+"use client"; // Required for useState, useEffect
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Rocket, LogIn, UserPlus, BookOpen, Link as LinkIcon, Shuffle, FileArchive, ArrowRight } from "lucide-react";
+import { Rocket, LogIn, UserPlus, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import type { Service } from "@/types";
+import * as LucideIcons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface ServiceFeature {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  imageUrl: string;
-  imageAlt: string;
-  aiHint: string;
-  learnMoreLink?: string; // Optional: if services have dedicated pages later
+const iconComponents: Record<string, LucideIcon> = {
+  ...LucideIcons,
+  Settings: LucideIcons.Settings, // Default/fallback
+};
+
+async function fetchActiveServicesFromFirestore(): Promise<Service[]> {
+  const servicesCol = collection(db, "services");
+  const q = query(servicesCol, where("isActive", "==", true));
+  const serviceSnapshot = await getDocs(q);
+  return serviceSnapshot.docs.map(docSnap => ({ slug: docSnap.id, ...docSnap.data() } as Service));
 }
 
-const services: ServiceFeature[] = [
-  {
-    icon: BookOpen,
-    title: "Content Platform",
-    description: "Access exclusive articles, tutorials, and a wealth of curated content across various topics.",
-    imageUrl: "https://placehold.co/600x400.png",
-    imageAlt: "Content Platform illustration",
-    aiHint: "library books",
-    learnMoreLink: "/dashboard/my-services", // Example link
-  },
-  {
-    icon: LinkIcon,
-    title: "URL Shortener",
-    description: "Create concise, shareable links. Track clicks and manage your shortened URLs with ease.",
-    imageUrl: "https://placehold.co/600x400.png",
-    imageAlt: "URL Shortener illustration",
-    aiHint: "link chain",
-    learnMoreLink: "/dashboard/my-services",
-  },
-  {
-    icon: Shuffle,
-    title: "Randomizer Tool",
-    description: "Generate random numbers, lists, or make random selections for games, decisions, or data generation.",
-    imageUrl: "https://placehold.co/600x400.png",
-    imageAlt: "Randomizer Tool illustration",
-    aiHint: "dice chance",
-    learnMoreLink: "/dashboard/my-services",
-  },
-  {
-    icon: FileArchive,
-    title: "File Storage",
-    description: "Securely store, organize, and share your files. Access your documents from anywhere.",
-    imageUrl: "https://placehold.co/600x400.png",
-    imageAlt: "File Storage illustration",
-    aiHint: "cloud storage",
-    learnMoreLink: "/dashboard/my-services",
-  },
-];
-
 export default function HomePage() {
+  const [activeServices, setActiveServices] = useState<Service[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
+
+  useEffect(() => {
+    const loadServices = async () => {
+      setIsLoadingServices(true);
+      try {
+        const fetchedServices = await fetchActiveServicesFromFirestore();
+        setActiveServices(fetchedServices);
+      } catch (error) {
+        console.error("Error fetching active services for landing page:", error);
+        // Optionally, set an error state to display a message to the user
+      } finally {
+        setIsLoadingServices(false);
+      }
+    };
+    loadServices();
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/10">
       {/* Header */}
@@ -112,41 +102,58 @@ export default function HomePage() {
             <p className="text-lg text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
               Discover the tools designed to enhance your productivity and digital experience.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-              {services.map((service) => (
-                <Card key={service.title} className="overflow-hidden shadow-xl rounded-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col">
-                  <div className="relative w-full h-56">
-                    <Image
-                      src={service.imageUrl}
-                      alt={service.imageAlt}
-                      layout="fill"
-                      objectFit="cover"
-                      data-ai-hint={service.aiHint}
-                    />
-                  </div>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <service.icon className="w-8 h-8 text-primary" />
-                      <CardTitle className="text-2xl font-headline">{service.title}</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <CardDescription className="text-base text-foreground/80">
-                      {service.description}
-                    </CardDescription>
-                  </CardContent>
-                  {service.learnMoreLink && (
+            {isLoadingServices ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+                {[...Array(4)].map((_, index) => (
+                  <Card key={index} className="overflow-hidden shadow-xl rounded-xl flex flex-col">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <Skeleton className="h-7 w-1/2" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <Skeleton className="h-4 w-full mb-2" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </CardContent>
                     <CardFooter>
-                       <Button variant="outline" asChild className="w-full mt-4">
-                          <Link href={service.learnMoreLink}>
+                      <Skeleton className="h-10 w-full" />
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : activeServices.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+                {activeServices.map((service) => {
+                  const IconComponent = iconComponents[service.icon] || LucideIcons.Settings;
+                  return (
+                    <Card key={service.slug} className="overflow-hidden shadow-xl rounded-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col">
+                      {/* Image removed as per request */}
+                      <CardHeader className="pb-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <IconComponent className="w-8 h-8 text-primary" />
+                          <CardTitle className="text-2xl font-headline">{service.name}</CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        <CardDescription className="text-base text-foreground/80">
+                          {service.description}
+                        </CardDescription>
+                      </CardContent>
+                      <CardFooter>
+                        <Button variant="outline" asChild className="w-full mt-4">
+                          <Link href="/dashboard/my-services">
                             Access Service <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
-                    </CardFooter>
-                  )}
-                </Card>
-              ))}
-            </div>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground">No active services available at the moment. Please check back later.</p>
+            )}
           </div>
         </section>
 
@@ -170,6 +177,9 @@ export default function HomePage() {
       <footer className="py-8 border-t bg-background">
         <div className="container text-center text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Ozarnia Hub by myozarniaung.com. All rights reserved.</p>
+           <p className="text-sm mt-1">
+            <Link href="/docs" className="hover:underline text-primary">Documentation</Link>
+          </p>
         </div>
       </footer>
     </div>

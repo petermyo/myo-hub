@@ -15,7 +15,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench, Package } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, ShieldCheck, Layers, UserCircle, Settings as SettingsIcon, LifeBuoy, Wrench, Package, FileCode } from "lucide-react"; // Added FileCode
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -36,6 +36,7 @@ const adminNavItems = [
 const helpNavItems = [
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
   { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
+  { href: "/docs", label: "Documentation", icon: FileCode }, // Changed from /docs/api to /docs
 ]
 
 export function MainSidebar() {

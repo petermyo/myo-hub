@@ -18,16 +18,21 @@ import {
 import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react";
 import { format } from 'date-fns';
 import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation"; // Import useRouter
 
 interface UsersTableColumnsProps {
-  onEdit: (user: User) => void;
+  onEdit: (user: User) => void; // This can be kept for quick edit in dialog if needed, or repurposed
   onDelete: (user: User) => void;
-  onViewDetails: (user: User) => void;
+  // onViewDetails: (user: User) => void; // Will be replaced by direct navigation
 }
 
-export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsProps): ColumnDef<User>[] => {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { currentUser: performingUser } = useAuth(); // Get current authenticated user's details
+export const columns = ({ onEdit, onDelete }: UsersTableColumnsProps): ColumnDef<User>[] => {
+  const { currentUser: performingUser } = useAuth();
+  const router = useRouter(); // Initialize router
+
+  const handleViewDetails = (user: User) => {
+    router.push(`/dashboard/admin/users/${user.uid}`);
+  };
 
   return [
     {
@@ -150,16 +155,14 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
         const isSelf = performingUser?.uid === user.uid;
         const performingUserRole = performingUser?.role;
 
-        let canEdit = false;
+        let canEditInDialog = false; // For quick edit dialog, if still used
         let canDelete = false;
 
         if (performingUserRole === "Administrator") {
-          canEdit = true; // Admin can edit anyone (including self, though usually via profile page)
-          canDelete = !isSelf; // Admin cannot delete self via this table
+          canEditInDialog = true; 
+          canDelete = !isSelf; 
         } else if (performingUserRole === "Editor") {
-          // Editors can edit users unless the target user is an Administrator or another Editor.
-          canEdit = !isSelf && user.role !== "Administrator" && user.role !== "Editor";
-          // Editors cannot delete any users.
+          canEditInDialog = !isSelf && user.role !== "Administrator" && user.role !== "Editor";
           canDelete = false;
         }
 
@@ -173,21 +176,22 @@ export const columns = ({ onEdit, onDelete, onViewDetails }: UsersTableColumnsPr
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onViewDetails(user)}>
+              <DropdownMenuItem onClick={() => handleViewDetails(user)}>
                 <Eye className="mr-2 h-4 w-4" />
-                View Details
+                View/Edit Details
               </DropdownMenuItem>
-              {canEdit ? (
+              {/* Optional: Keep quick edit via dialog if 'onEdit' is still relevant */}
+              {/* {canEditInDialog ? (
                 <DropdownMenuItem onClick={() => onEdit(user)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit User
+                  Quick Edit
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem disabled>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit User (Restricted)
+                  Quick Edit (Restricted)
                 </DropdownMenuItem>
-              )}
+              )} */}
               <DropdownMenuSeparator />
               {canDelete ? (
                 <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
